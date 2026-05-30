@@ -1,8 +1,6 @@
 "use client";
-// components/ui/SpeedWidget.tsx
-
+// components/ui/SpeedWidget.tsx — always-visible speed gauge
 import { cn } from "@/lib/utils";
-import GlassPanel from "./GlassPanel";
 
 interface SpeedWidgetProps {
     speed: number; // km/h
@@ -12,85 +10,87 @@ interface SpeedWidgetProps {
 
 export default function SpeedWidget({ speed, unit = "kmh", className }: SpeedWidgetProps) {
     const maxSpeed = 200;
-    const percentage = Math.min((speed / maxSpeed) * 100, 100);
-    const displaySpeed = unit === "mph" ? Math.round(speed * 0.621371) : Math.round(speed);
+    const pct = Math.min((speed / maxSpeed) * 100, 100);
+    const display = unit === "mph" ? Math.round(speed * 0.621371) : Math.round(speed);
 
-    // Color based on speed
     const speedColor =
-        speed > 120
-            ? "#FF2D55"
-            : speed > 80
-                ? "#FFD60A"
-                : "#00D4FF";
+        speed > 120 ? "#FF2D55" :
+            speed > 80 ? "#FFD60A" :
+                "#00D4FF";
 
-    // SVG arc calculation
-    const r = 38;
-    const cx = 50;
-    const cy = 50;
-    const startAngle = -220;
-    const endAngle = 40;
+    // SVG arc maths
+    const r = 36, cx = 44, cy = 44;
+    const startAngle = -210, endAngle = 30;
     const totalAngle = endAngle - startAngle;
-    const progressAngle = startAngle + (totalAngle * percentage) / 100;
+    const progAngle = startAngle + (totalAngle * pct) / 100;
 
-    const polarToCartesian = (angle: number) => {
-        const rad = ((angle - 90) * Math.PI) / 180;
-        return {
-            x: cx + r * Math.cos(rad),
-            y: cy + r * Math.sin(rad),
-        };
+    const polar = (a: number) => {
+        const rad = ((a - 90) * Math.PI) / 180;
+        return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    };
+    const arc = (start: number, end: number) => {
+        const s = polar(start), e = polar(end);
+        const large = end - start > 180 ? 1 : 0;
+        return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
     };
 
-    const describeArc = (start: number, end: number) => {
-        const s = polarToCartesian(start);
-        const e = polarToCartesian(end);
-        const largeArc = end - start > 180 ? 1 : 0;
-        return `M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y}`;
+    const panelStyle: React.CSSProperties = {
+        background: "rgba(10,10,10,0.92)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        border: "1.5px solid rgba(255,255,255,0.15)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.07)",
     };
 
     return (
-        <GlassPanel
-            className={cn("flex flex-col items-center justify-center p-3 w-28 h-28", className)}
-            rounded="2xl"
+        <div
+            className={cn("flex flex-col items-center justify-center rounded-2xl p-2 w-24 h-24", className)}
+            style={panelStyle}
         >
-            <div className="relative w-20 h-20">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-0">
-                    {/* Background track */}
+            <div className="relative w-16 h-16">
+                <svg viewBox="0 0 88 88" className="w-full h-full">
+                    {/* Track */}
                     <path
-                        d={describeArc(startAngle, endAngle)}
+                        d={arc(startAngle, endAngle)}
                         fill="none"
                         stroke="rgba(255,255,255,0.08)"
                         strokeWidth="6"
                         strokeLinecap="round"
                     />
-                    {/* Progress arc */}
+                    {/* Progress */}
                     {speed > 0 && (
                         <path
-                            d={describeArc(startAngle, progressAngle)}
+                            d={arc(startAngle, progAngle)}
                             fill="none"
                             stroke={speedColor}
                             strokeWidth="6"
                             strokeLinecap="round"
                             style={{
-                                filter: `drop-shadow(0 0 4px ${speedColor})`,
-                                transition: "all 0.3s ease",
+                                filter: `drop-shadow(0 0 5px ${speedColor})`,
+                                transition: "all 0.35s ease",
                             }}
                         />
                     )}
                 </svg>
 
-                {/* Speed text */}
+                {/* Centred speed text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span
-                        className="speed-display text-2xl font-bold leading-none"
-                        style={{ color: speedColor }}
+                        className="font-display font-black leading-none"
+                        style={{
+                            fontSize: display >= 100 ? 18 : 22,
+                            color: speedColor,
+                            textShadow: `0 0 12px ${speedColor}80`,
+                            fontVariantNumeric: "tabular-nums",
+                        }}
                     >
-                        {displaySpeed}
+                        {display}
                     </span>
-                    <span className="text-[9px] text-white/40 font-display uppercase tracking-wider mt-0.5">
+                    <span className="text-[8px] font-display uppercase tracking-wider mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
                         {unit === "kmh" ? "km/h" : "mph"}
                     </span>
                 </div>
             </div>
-        </GlassPanel>
+        </div>
     );
 }

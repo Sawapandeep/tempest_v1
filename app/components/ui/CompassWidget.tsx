@@ -1,75 +1,93 @@
 "use client";
 // components/ui/CompassWidget.tsx
-
+// Always-visible compass — opaque backing, contrast ring, works on any tile / theme
 import { cn } from "@/lib/utils";
-import GlassPanel from "./GlassPanel";
 import { bearingToCardinal } from "@/lib/utils";
 
 interface CompassWidgetProps {
-    bearing: number; // 0–360
+    bearing: number;
     className?: string;
+    onPress?: () => void;
 }
 
-export default function CompassWidget({ bearing, className }: CompassWidgetProps) {
+export default function CompassWidget({ bearing, className, onPress }: CompassWidgetProps) {
     const cardinal = bearingToCardinal(bearing);
 
+    const panelStyle: React.CSSProperties = {
+        background: "rgba(10,10,10,0.92)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        border: "1.5px solid rgba(255,255,255,0.16)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.08)",
+    };
+
     return (
-        <GlassPanel
-            className={cn("flex flex-col items-center justify-center p-3 w-20 h-20", className)}
-            rounded="2xl"
+        <button
+            onClick={onPress}
+            className={cn(
+                "flex flex-col items-center justify-center rounded-2xl w-14 h-14 active:scale-90 transition-transform select-none",
+                className
+            )}
+            style={panelStyle}
         >
-            <div className="relative w-12 h-12 flex items-center justify-center">
-                {/* Compass rose */}
+            {/* Compass rose SVG */}
+            <div className="relative w-9 h-9 flex items-center justify-center">
                 <svg
                     viewBox="0 0 48 48"
-                    className="w-full h-full absolute"
-                    style={{ transform: `rotate(${-bearing}deg)`, transition: "transform 0.3s ease" }}
+                    className="w-full h-full"
+                    style={{
+                        transform: `rotate(${-bearing}deg)`,
+                        transition: "transform 0.4s cubic-bezier(0.16,1,0.3,1)",
+                    }}
                 >
-                    {/* Circle */}
-                    <circle
-                        cx="24"
-                        cy="24"
-                        r="20"
-                        fill="none"
-                        stroke="rgba(255,255,255,0.1)"
-                        strokeWidth="1"
-                    />
-                    {/* N arrow */}
+                    {/* Outer ring */}
+                    <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
+
+                    {/* N arrow — red/cyan with white halo */}
                     <polygon
-                        points="24,4 27,22 21,22"
+                        points="24,5 27.5,22 20.5,22"
                         fill="#00D4FF"
-                        style={{ filter: "drop-shadow(0 0 3px #00D4FF)" }}
+                        stroke="#FFFFFF"
+                        strokeWidth="0.8"
+                        style={{ filter: "drop-shadow(0 0 4px #00D4FF)" }}
                     />
-                    {/* S arrow */}
+
+                    {/* S arrow — muted white */}
                     <polygon
-                        points="24,44 27,26 21,26"
-                        fill="rgba(255,255,255,0.3)"
+                        points="24,43 27.5,26 20.5,26"
+                        fill="rgba(255,255,255,0.28)"
                     />
-                    {/* Cardinal marks */}
+
+                    {/* E / W tick marks */}
                     {[0, 90, 180, 270].map((angle) => {
                         const rad = ((angle - 90) * Math.PI) / 180;
                         const x1 = 24 + 17 * Math.cos(rad);
                         const y1 = 24 + 17 * Math.sin(rad);
-                        const x2 = 24 + 20 * Math.cos(rad);
-                        const y2 = 24 + 20 * Math.sin(rad);
+                        const x2 = 24 + 21 * Math.cos(rad);
+                        const y2 = 24 + 21 * Math.sin(rad);
                         return (
                             <line
                                 key={angle}
                                 x1={x1} y1={y1} x2={x2} y2={y2}
-                                stroke="rgba(255,255,255,0.3)"
-                                strokeWidth="1.5"
+                                stroke="rgba(255,255,255,0.30)"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
                             />
                         );
                     })}
-                    {/* Center dot */}
-                    <circle cx="24" cy="24" r="2" fill="rgba(255,255,255,0.6)" />
+
+                    {/* Centre dot */}
+                    <circle cx="24" cy="24" r="2.5" fill="#FFFFFF" fillOpacity={0.8} />
                 </svg>
             </div>
 
             {/* Cardinal label */}
-            <span className="text-[9px] font-display font-bold text-tempest-cyan mt-1 uppercase tracking-wider">
+            <span
+                className="text-[9px] font-display font-bold uppercase tracking-widest mt-0.5"
+                style={{ color: "#00D4FF", textShadow: "0 0 8px #00D4FF80" }}
+            >
                 {cardinal}
             </span>
-        </GlassPanel>
+        </button>
     );
 }

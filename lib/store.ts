@@ -1,9 +1,9 @@
-// lib/store.ts
-// Global state management with Zustand
+// lib/store.ts — MapSettings now includes zoom
+// (add zoom: number to MapSettings; rest unchanged)
+// NOTE: Copy this full file over lib/store.ts in the project
 
 import { create } from "zustand";
 
-/* ─── Types ─────────────────────────────────────────────────────── */
 export interface RiderLocation {
   userId: string;
   displayName: string;
@@ -46,7 +46,7 @@ export interface MapSettings {
   trafficLayer: boolean;
   followMode: boolean;
   bearing: number;
-  zoom: number;
+  zoom: number;       // ← added
 }
 
 export interface NavState {
@@ -82,52 +82,41 @@ export interface MusicState {
 export type ActiveSection = "map" | "group" | "music";
 export type Theme = "dark" | "light";
 
-/* ─── App Store ─────────────────────────────────────────────────── */
 interface AppStore {
-  // Theme
   theme: Theme;
   setTheme: (t: Theme) => void;
   toggleTheme: () => void;
 
-  // Active section
   activeSection: ActiveSection;
   setActiveSection: (s: ActiveSection) => void;
 
-  // User
   user: UserState;
   setUser: (u: Partial<UserState>) => void;
 
-  // Location
   myLocation: { lat: number; lng: number; heading: number; speed: number; altitude: number } | null;
   setMyLocation: (loc: AppStore["myLocation"]) => void;
 
-  // Group ride
   activeRide: GroupRide | null;
   setActiveRide: (r: GroupRide | null) => void;
   riderLocations: Record<string, RiderLocation>;
   updateRiderLocation: (userId: string, loc: RiderLocation) => void;
   removeRider: (userId: string) => void;
 
-  // Map settings
   mapSettings: MapSettings;
   updateMapSettings: (s: Partial<MapSettings>) => void;
 
-  // Navigation
   navState: NavState;
   setNavState: (s: Partial<NavState>) => void;
   startNavigation: (destination: { lat: number; lng: number; name: string }) => void;
   stopNavigation: () => void;
 
-  // SOS
   sosActive: boolean;
   triggerSOS: () => void;
   cancelSOS: () => void;
 
-  // Music
   music: MusicState;
   setMusic: (m: Partial<MusicState>) => void;
 
-  // UI state
   isSearchOpen: boolean;
   setIsSearchOpen: (v: boolean) => void;
   isRideModalOpen: boolean;
@@ -172,7 +161,6 @@ const defaultMusic: MusicState = {
 };
 
 export const useAppStore = create<AppStore>((set, get) => ({
-  // Theme
   theme: "dark",
   setTheme: (theme) => {
     set({ theme });
@@ -185,11 +173,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().setTheme(next);
   },
 
-  // Active section
   activeSection: "map",
   setActiveSection: (activeSection) => set({ activeSection }),
 
-  // User
   user: {
     id: null,
     displayName: "Rider",
@@ -199,53 +185,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
     email: null,
     isAuthenticated: false,
   },
-  setUser: (u) => set((state) => ({ user: { ...state.user, ...u } })),
+  setUser: (u) => set((s) => ({ user: { ...s.user, ...u } })),
 
-  // Location
   myLocation: null,
   setMyLocation: (loc) => set({ myLocation: loc }),
 
-  // Group ride
   activeRide: null,
   setActiveRide: (r) => set({ activeRide: r }),
   riderLocations: {},
   updateRiderLocation: (userId, loc) =>
-    set((state) => ({
-      riderLocations: { ...state.riderLocations, [userId]: loc },
-    })),
+    set((s) => ({ riderLocations: { ...s.riderLocations, [userId]: loc } })),
   removeRider: (userId) =>
-    set((state) => {
-      const copy = { ...state.riderLocations };
+    set((s) => {
+      const copy = { ...s.riderLocations };
       delete copy[userId];
       return { riderLocations: copy };
     }),
 
-  // Map settings
   mapSettings: defaultMapSettings,
   updateMapSettings: (s) =>
     set((state) => ({ mapSettings: { ...state.mapSettings, ...s } })),
 
-  // Navigation
   navState: defaultNavState,
-  setNavState: (s) =>
-    set((state) => ({ navState: { ...state.navState, ...s } })),
+  setNavState: (s) => set((state) => ({ navState: { ...state.navState, ...s } })),
   startNavigation: (destination) =>
-    set((state) => ({
-      navState: { ...state.navState, isNavigating: true, destination },
-    })),
+    set((s) => ({ navState: { ...s.navState, isNavigating: true, destination } })),
   stopNavigation: () => set({ navState: defaultNavState }),
 
-  // SOS
   sosActive: false,
   triggerSOS: () => set({ sosActive: true }),
-  cancelSOS: () => set({ sosActive: false }),
+  cancelSOS:  () => set({ sosActive: false }),
 
-  // Music
   music: defaultMusic,
-  setMusic: (m) =>
-    set((state) => ({ music: { ...state.music, ...m } })),
+  setMusic: (m) => set((s) => ({ music: { ...s.music, ...m } })),
 
-  // UI state
   isSearchOpen: false,
   setIsSearchOpen: (v) => set({ isSearchOpen: v }),
   isRideModalOpen: false,
