@@ -57,10 +57,16 @@ export default function Home() {
     else html.classList.remove("light");
   }, [theme]);
 
-  const handleTabChange = (id: ActiveSection | "settings") => {
-    if (id === "settings") { setShowSettings(true); return; }
-    setActiveTab(id);
-    setActiveSection(id as ActiveSection);
+  const handleTabChange = (id: string) => {
+    if (id === "settings") {
+      setShowSettings(true);
+      return;
+    }
+
+    if (id === "map" || id === "group" || id === "music") {
+      setActiveTab(id);
+      setActiveSection(id);
+    }
   };
 
   if (showSplash) return <SplashScreen onDone={() => setShowSplash(false)} />;
