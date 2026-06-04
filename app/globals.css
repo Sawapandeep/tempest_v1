@@ -1,0 +1,281 @@
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── MapLibre GL ─────────────────────────────────────────── */
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* ─── Design Tokens ───────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Radius */
+    --radius: 0.75rem;
+
+    /* ── Light Theme ── */
+    --background:        210 20% 98%;
+    --foreground:        215 25% 12%;
+
+    --surface:           0 0% 100%;
+    --surface-subtle:    210 20% 96%;
+    --surface-elevated:  0 0% 100%;
+    --surface-overlay:   0 0% 100%;
+
+    --card:              0 0% 100%;
+    --card-foreground:   215 25% 12%;
+
+    --popover:           0 0% 100%;
+    --popover-foreground:215 25% 12%;
+
+    --primary:           210 85% 54%;
+    --primary-foreground:0 0% 100%;
+
+    --secondary:         210 20% 94%;
+    --secondary-foreground: 215 25% 20%;
+
+    --muted:             210 15% 93%;
+    --muted-foreground:  215 15% 46%;
+
+    --accent:            210 85% 54%;
+    --accent-hover:      210 85% 47%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive:       0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:            215 20% 88%;
+    --input:             215 20% 88%;
+    --ring:              210 85% 54%;
+
+    /* Map controls glass */
+    --glass-bg:          rgba(255,255,255,0.85);
+    --glass-border:      rgba(0,0,0,0.08);
+    --glass-shadow:      0 4px 24px rgba(0,0,0,0.12);
+
+    /* Search */
+    --search-bg:         rgba(255,255,255,0.95);
+  }
+
+  .dark {
+    /* ── Dark Theme ── */
+    --background:        216 28% 7%;
+    --foreground:        210 20% 92%;
+
+    --surface:           216 24% 10%;
+    --surface-subtle:    216 22% 13%;
+    --surface-elevated:  216 20% 15%;
+    --surface-overlay:   216 22% 12%;
+
+    --card:              216 24% 10%;
+    --card-foreground:   210 20% 92%;
+
+    --popover:           216 24% 10%;
+    --popover-foreground:210 20% 92%;
+
+    --primary:           210 85% 60%;
+    --primary-foreground:216 28% 7%;
+
+    --secondary:         216 20% 16%;
+    --secondary-foreground: 210 20% 80%;
+
+    --muted:             216 18% 16%;
+    --muted-foreground:  215 15% 52%;
+
+    --accent:            210 85% 60%;
+    --accent-hover:      210 85% 67%;
+    --accent-foreground: 216 28% 7%;
+
+    --destructive:       0 63% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:            216 18% 18%;
+    --input:             216 18% 18%;
+    --ring:              210 85% 60%;
+
+    /* Map controls glass */
+    --glass-bg:          rgba(14, 20, 32, 0.88);
+    --glass-border:      rgba(255,255,255,0.07);
+    --glass-shadow:      0 4px 32px rgba(0,0,0,0.5);
+
+    /* Search */
+    --search-bg:         rgba(14, 20, 32, 0.96);
+  }
+}
+
+/* ─── Base Resets ─────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    @apply h-full;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground h-full overflow-hidden;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  #__next,
+  main {
+    @apply h-full;
+  }
+}
+
+/* ─── MapLibre Overrides ──────────────────────────────────── */
+.maplibregl-map {
+  font-family: inherit;
+}
+
+.maplibregl-ctrl-attrib {
+  @apply text-xs;
+  background: var(--glass-bg) !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Hide default MapLibre controls — we use custom ones */
+.maplibregl-ctrl-top-left,
+.maplibregl-ctrl-top-right,
+.maplibregl-ctrl-bottom-left {
+  display: none !important;
+}
+
+.maplibregl-ctrl-bottom-right {
+  @apply pointer-events-none;
+}
+
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib {
+  @apply pointer-events-auto;
+}
+
+/* ─── Glass Utility ───────────────────────────────────────── */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-subtle {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Map control button base */
+  .map-ctrl-btn {
+    @apply flex items-center justify-center rounded-xl
+           text-foreground transition-all duration-150
+           hover:bg-white/10 active:scale-95
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+
+  /* Shimmer skeleton */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s linear infinite;
+  }
+}
+
+/* ─── Custom Marker ───────────────────────────────────────── */
+.tempest-marker {
+  cursor: pointer;
+  transform-origin: bottom center;
+  transition: transform 0.15s ease;
+}
+
+.tempest-marker:hover {
+  transform: scale(1.1) translateY(-2px);
+}
+
+.tempest-user-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  position: relative;
+}
+
+.tempest-user-dot::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: hsl(var(--primary) / 0.2);
+  animation: ping 2s cubic-bezier(0,0,0.2,1) infinite;
+}
+
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* ─── Bottom Sheet ────────────────────────────────────────── */
+.bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: hsl(var(--border));
+  border-radius: 9999px;
+  margin: 0 auto;
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────── */
+.sidebar-enter {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* ─── Tooltip ─────────────────────────────────────────────── */
+[data-radix-tooltip-content] {
+  @apply text-xs;
+}
+
+/* ─── Focus Visible ───────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* ─── No-scrollbar utility ────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
