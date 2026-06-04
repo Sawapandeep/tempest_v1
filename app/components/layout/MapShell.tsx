@@ -1,7 +1,6 @@
 "use client";
 // src/components/layout/MapShell.tsx
 
-import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MapCanvas } from "@/components/map/MapCanvas";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -10,24 +9,26 @@ import { LayerSwitcher } from "@/components/map/LayerSwitcher";
 import { ScaleIndicator } from "@/components/map/ScaleIndicator";
 import { SearchBar } from "@/features/search/components/SearchBar";
 import { MobileBottomSheet } from "@/components/layout/MobileBottomSheet";
+import { PlaceDetailPanel } from "@/components/map/PlaceDetailPanel";
+import { SelectedPlaceMarker } from "@/components/map/SelectedPlaceMarker";
 import { useMapStore } from "@/store/mapStore";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export function MapShell() {
   const isMapLoaded = useMapStore((s) => s.isMapLoaded);
+  const selectedPlace = useMapStore((s) => s.selectedPlace);
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // On desktop sidebar is always visible, on mobile it's a bottom sheet
-  const showSidebar = !isMobile;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
-      {/* ── Map Canvas (always full screen) ── */}
+      {/* Map Canvas */}
       <MapCanvas />
 
-      {/* ── Desktop Layout ── */}
-      {showSidebar && (
+      {/* Selected place map marker */}
+      <SelectedPlaceMarker />
+
+      {/* Desktop Sidebar */}
+      {!isMobile && (
         <AnimatePresence>
           <motion.aside
             key="sidebar"
@@ -42,48 +43,56 @@ export function MapShell() {
         </AnimatePresence>
       )}
 
-      {/* ── Mobile Search Bar (top) ── */}
+      {/* Mobile Search Bar */}
       {isMobile && (
         <div className="absolute top-3 left-3 right-3 z-30 pointer-events-auto">
           <SearchBar compact />
         </div>
       )}
 
-      {/* ── Map Controls (right side) ── */}
+      {/* Map Controls */}
       <div
-        className={`
-          absolute z-20 flex flex-col gap-2 pointer-events-auto
-          ${isMobile ? "right-3 bottom-36" : "right-4 bottom-10"}
-        `}
+        className={`absolute z-20 flex flex-col gap-2 pointer-events-auto ${isMobile ? "right-3 bottom-36" : "right-4 bottom-10"
+          }`}
       >
         <MapControls />
       </div>
 
-      {/* ── Layer Switcher (bottom-left on desktop) ── */}
+      {/* Layer Switcher — desktop only */}
       {!isMobile && (
         <div className="absolute bottom-6 left-[376px] z-20 pointer-events-auto">
           <LayerSwitcher />
         </div>
       )}
 
-      {/* ── Scale Indicator ── */}
+      {/* Place Detail Panel */}
+      <AnimatePresence>
+        {selectedPlace && (
+          <div
+            className={`absolute z-25 pointer-events-auto ${isMobile ? "bottom-24 left-3 right-3" : "bottom-20 left-[376px]"
+              }`}
+          >
+            <PlaceDetailPanel />
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Scale Indicator */}
       <div
-        className={`
-          absolute z-10 pointer-events-none
-          ${isMobile ? "bottom-28 left-3" : "bottom-6 right-[108px]"}
-        `}
+        className={`absolute z-10 pointer-events-none ${isMobile ? "bottom-28 left-3" : "bottom-6 right-28"
+          }`}
       >
         <ScaleIndicator />
       </div>
 
-      {/* ── Mobile Bottom Sheet ── */}
+      {/* Mobile Bottom Sheet */}
       {isMobile && (
         <div className="absolute bottom-0 left-0 right-0 z-30">
           <MobileBottomSheet />
         </div>
       )}
 
-      {/* ── Map overlay fade when loading ── */}
+      {/* Map load fade overlay */}
       <AnimatePresence>
         {!isMapLoaded && (
           <motion.div
