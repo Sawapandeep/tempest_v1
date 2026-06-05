@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+    allowedDevOrigins: [
+    "10.19.138.88",
+  ],
+
   images: {
     remotePatterns: [
       {
