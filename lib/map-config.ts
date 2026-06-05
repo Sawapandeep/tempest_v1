@@ -1,16 +1,13 @@
-// src/lib/map-config.ts
+// lib/map-config.ts
 import type { MapLayer, MapStyle, MapViewState } from "@/types/map";
 
-// Default map view - World center
 export const DEFAULT_VIEW_STATE: MapViewState = {
-  center: { lng: 0, lat: 20 },
-  zoom: 2,
+  center: { lng: 78.9629, lat: 20.5937 }, // India
+  zoom: 5,
   bearing: 0,
   pitch: 0,
 };
 
-// OpenMapTiles / MapTiler compatible styles
-// Using free OSM-based tile styles
 export const MAP_STYLES: Record<string, MapStyle> = {
   standard: {
     id: "standard",
@@ -29,7 +26,6 @@ export const MAP_STYLES: Record<string, MapStyle> = {
   },
 };
 
-// Default dark style
 export const DEFAULT_DARK_STYLE =
   "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 export const DEFAULT_LIGHT_STYLE =
@@ -56,19 +52,19 @@ export const MAP_LAYERS: MapLayer[] = [
     id: "satellite",
     label: "Satellite",
     icon: "Satellite",
-    available: false, // Placeholder
+    available: false,
   },
   {
     id: "traffic",
     label: "Traffic",
     icon: "Car",
-    available: false, // Placeholder
+    available: false,
   },
   {
     id: "transit",
     label: "Transit",
     icon: "Train",
-    available: false, // Placeholder
+    available: false,
   },
 ];
 
@@ -80,7 +76,8 @@ export const MAP_CONFIG = {
   GEOLOCATION_ZOOM: 16,
   ANIMATION_DURATION: 500,
   PITCH_3D: 45,
-  ATTRIBUTION: "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors © <a href='https://carto.com/attributions'>CARTO</a>",
+  ATTRIBUTION:
+    "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors © <a href='https://carto.com/attributions'>CARTO</a>",
 } as const;
 
 export const TILE_PROVIDERS = {

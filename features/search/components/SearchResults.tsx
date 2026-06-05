@@ -1,10 +1,15 @@
-"use client";
 // features/search/components/SearchResults.tsx
+"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    MapPin, Clock, Navigation, Building2, Globe,
-    Hash, AlertCircle, Loader2,
+    MapPin,
+    Clock,
+    Navigation,
+    Building2,
+    Globe,
+    Hash,
+    AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSearch } from "@/features/search/hooks/useSearch";
@@ -12,11 +17,20 @@ import { useMapStore } from "@/store/mapStore";
 import { MAP_CONFIG } from "@/lib/map-config";
 import type { GeocodingResult } from "@/types/map";
 
-// ── Highlight matching text ───────────────────────────────────
+// ------------------------------------------------------------------
+// Highlight matching text — escapes regex special chars
+// ------------------------------------------------------------------
 function HighlightMatch({ text, query }: { text: string; query: string }) {
     if (!query.trim()) return <>{text}</>;
+
     const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escaped})`, "gi");
+    let regex: RegExp;
+    try {
+        regex = new RegExp(`(${escaped})`, "gi");
+    } catch {
+        return <>{text}</>;
+    }
+
     const parts = text.split(regex);
     return (
         <>
@@ -36,21 +50,42 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
     );
 }
 
-// ── Category icon ─────────────────────────────────────────────
+// ------------------------------------------------------------------
+// Icon resolution by OSM category
+// ------------------------------------------------------------------
 function getCategoryIcon(category?: string): React.ElementType {
     if (!category) return MapPin;
     const c = category.toLowerCase();
     if (c.includes("coordinate")) return Hash;
-    if (c.includes("building") || c.includes("amenity") || c.includes("shop"))
+    if (
+        c.includes("building") ||
+        c.includes("amenity") ||
+        c.includes("shop") ||
+        c.includes("office")
+    )
         return Building2;
-    if (c.includes("highway") || c.includes("road") || c.includes("street"))
+    if (
+        c.includes("highway") ||
+        c.includes("road") ||
+        c.includes("street") ||
+        c.includes("route")
+    )
         return Navigation;
-    if (c.includes("place") || c.includes("boundary") || c.includes("admin"))
+    if (
+        c.includes("place") ||
+        c.includes("boundary") ||
+        c.includes("admin") ||
+        c.includes("country") ||
+        c.includes("state") ||
+        c.includes("city")
+    )
         return Globe;
     return MapPin;
 }
 
-// ── Single result row ─────────────────────────────────────────
+// ------------------------------------------------------------------
+// Single result row
+// ------------------------------------------------------------------
 interface ResultRowProps {
     result: GeocodingResult;
     query: string;
@@ -62,7 +97,13 @@ interface ResultRowProps {
 }
 
 function ResultRow({
-    result, query, index, isActive, isRecent, onClick, onHover,
+    result,
+    query,
+    index,
+    isActive,
+    isRecent,
+    onClick,
+    onHover,
 }: ResultRowProps) {
     const Icon = isRecent ? Clock : getCategoryIcon(result.category);
 
@@ -73,7 +114,6 @@ function ResultRow({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.03, duration: 0.15 }}
             onMouseDown={(e) => {
-                // Prevent blur before click fires
                 e.preventDefault();
                 onClick();
             }}
@@ -120,7 +160,7 @@ function ResultRow({
                     </p>
                 )}
                 {result.category && !isRecent && (
-                    <span className="inline-block mt-1 text-[10px] text-tempest-400/70 bg-tempest-500/8 rounded px-1.5 py-0.5 leading-none">
+                    <span className="inline-block mt-1 text-[10px] text-tempest-400/80 bg-tempest-500/10 rounded-md px-1.5 py-0.5 leading-none">
                         {result.category}
                     </span>
                 )}
@@ -131,7 +171,9 @@ function ResultRow({
     );
 }
 
-// ── Loading skeletons ─────────────────────────────────────────
+// ------------------------------------------------------------------
+// Skeleton loader
+// ------------------------------------------------------------------
 function SkeletonRows() {
     return (
         <div className="px-3 py-2 flex flex-col gap-2">
@@ -148,28 +190,47 @@ function SkeletonRows() {
     );
 }
 
-// ── Main component ────────────────────────────────────────────
+// ------------------------------------------------------------------
+// Main component
+// ------------------------------------------------------------------
 interface SearchResultsProps {
     activeIndex?: number;
     onIndexChange?: (i: number) => void;
 }
 
-export function SearchResults({ activeIndex = -1, onIndexChange }: SearchResultsProps) {
-    const { query, results, isSearching, recentSearches, handleSelectResult } = useSearch();
+export function SearchResults({
+    activeIndex = -1,
+    onIndexChange,
+}: SearchResultsProps) {
+    const { query, results, isSearching, recentSearches, handleSelectResult } =
+        useSearch();
     const { flyTo, setSelectedPlace } = useMapStore();
 
     const handleSelect = (result: GeocodingResult) => {
         handleSelectResult(result);
         setSelectedPlace(result);
-        flyTo(
-            { lng: result.coordinates.lng, lat: result.coordinates.lat },
-            MAP_CONFIG.DEFAULT_ZOOM
-        );
+
+        // If result has a bounding box, fit to it; otherwise fly to center
+        if (result.bbox) {
+            const { north, south, east, west } = result.bbox;
+            const centerLng = (west + east) / 2;
+            const centerLat = (south + north) / 2;
+            // Rough zoom: tighter bbox → higher zoom
+            const latSpan = north - south;
+            const zoom = latSpan < 0.01 ? 16 : latSpan < 0.1 ? 14 : latSpan < 1 ? 12 : latSpan < 5 ? 9 : 6;
+            flyTo({ lng: centerLng, lat: centerLat }, zoom);
+        } else {
+            flyTo(
+                { lng: result.coordinates.lng, lat: result.coordinates.lat },
+                MAP_CONFIG.DEFAULT_ZOOM
+            );
+        }
     };
 
     const showRecents = !query.trim() && recentSearches.length > 0;
     const showResults = query.trim().length > 0 && results.length > 0;
-    const isEmpty = query.trim().length > 0 && !isSearching && results.length === 0;
+    const isEmpty =
+        query.trim().length > 0 && !isSearching && results.length === 0;
 
     return (
         <div className="py-1" role="listbox" aria-label="Search results">
@@ -198,8 +259,9 @@ export function SearchResults({ activeIndex = -1, onIndexChange }: SearchResults
                         <AlertCircle className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <p className="text-sm font-medium text-foreground">No results found</p>
-                    <p className="text-xs text-muted-foreground">
-                        Try a city name, address, or coordinates like <code className="font-mono">40.71, -74.00</code>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        Try a city name, address, or coordinates like{" "}
+                        <code className="font-mono bg-muted px-1 rounded">28.61, 77.20</code>
                     </p>
                 </motion.div>
             )}
