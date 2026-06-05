@@ -1,8 +1,9 @@
 // lib/map-config.ts
 import type { MapLayer, MapStyle, MapViewState } from "@/types/map";
 
+// Default view: India (center of the country)
 export const DEFAULT_VIEW_STATE: MapViewState = {
-  center: { lng: 78.9629, lat: 20.5937 }, // India
+  center: { lng: 78.9629, lat: 20.5937 },
   zoom: 5,
   bearing: 0,
   pitch: 0,
@@ -82,7 +83,7 @@ export const MAP_CONFIG = {
 
 export const TILE_PROVIDERS = {
   OSM: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  CARTO_DARK: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-  CARTO_LIGHT: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  CARTO_DARK:    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  CARTO_LIGHT:   "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
   CARTO_VOYAGER: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
 } as const;

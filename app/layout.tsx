@@ -1,10 +1,9 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-// @ts-ignore
 import "./globals.css";
-import { ThemeProvider } from "@/components/layout/ThemeProvider";
-import { ToastProvider } from "@/components/ui/ToastProvider";
+import { ThemeProvider } from "@/app/components/layout/ThemeProvider";
+import { ToastProvider } from "@/app/components/ui/ToastProvider";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -25,14 +24,7 @@ export const metadata: Metadata = {
     },
     description:
         "Open-source mapping platform powered by OpenStreetMap. Navigate, explore, and discover with Tempest Maps.",
-    keywords: [
-        "maps",
-        "navigation",
-        "openstreetmap",
-        "routing",
-        "geocoding",
-        "open-source",
-    ],
+    keywords: ["maps", "navigation", "openstreetmap", "routing", "geocoding", "open-source"],
     authors: [{ name: "Tempest Maps" }],
     creator: "Tempest Maps",
     manifest: "/manifest.json",
@@ -65,11 +57,7 @@ export const viewport: Viewport = {
     ],
 };
 
-export default function RootLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="en" suppressHydrationWarning>
             <body
