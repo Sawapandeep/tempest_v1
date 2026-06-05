@@ -79,8 +79,8 @@ export function MapShell() {
         {selectedPlace && (
           <div
             className={`absolute pointer-events-auto z-30 ${isMobile
-                ? "bottom-24 left-3 right-3"
-                : "bottom-20 left-[376px]"
+              ? "bottom-24 left-3 right-3"
+              : "bottom-20 left-[376px]"
               }`}
           >
             <PlaceDetailPanel />
