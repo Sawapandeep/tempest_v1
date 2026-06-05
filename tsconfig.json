@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "target": "ES2017",
     "lib": [
       "dom",
       "dom.iterable",
@@ -16,6 +17,11 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    // "ignoreDeprecations": "5.0",
+
+  //  @ts-ignore-next-line
+    "baseUrl": ".",
+// @ts-ignore
     "plugins": [
       {
         "name": "next"
@@ -24,9 +30,35 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@/app/*": [
+        "app/*"
+      ],
+      "@/api/*": [
+        "api/*"
+      ],
+      "@/components/*": [
+        "app/components/*"
+      ],
+      "@/features/*": [
+        "features/*"
+      ],
+      "@/hooks/*": [
+        "hooks/*"
+      ],
+      "@/store/*": [
+        "store/*"
+      ],
+      "@/types/*": [
+        "types/*"
+      ],
+      "@/lib/*": [
+        "lib/*"
+      ],
+      "@/utils/*": [
+        "lib/*"
       ]
-    },
-    "target": "ES2017"
+    }
   },
   "include": [
     "next-env.d.ts",

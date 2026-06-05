@@ -1,48 +1,86 @@
 // app/layout.tsx
-// FIXED: html element no longer has className="dark" — theme is controlled
-// entirely via CSS variables and the html.light toggle in page.tsx
-
 import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+// @ts-ignore
 import "./globals.css";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { ToastProvider } from "@/components/ui/ToastProvider";
+
+const geistSans = Geist({
+    variable: "--font-geist-sans",
+    subsets: ["latin"],
+    display: "swap",
+});
+
+const geistMono = Geist_Mono({
+    variable: "--font-geist-mono",
+    subsets: ["latin"],
+    display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Tempest — Motorcycle Companion",
-  description: "Premium group ride navigation, live tracking & music control for motorcycle riders",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Tempest",
-  },
+    title: {
+        default: "Tempest Maps",
+        template: "%s | Tempest Maps",
+    },
+    description:
+        "Open-source mapping platform powered by OpenStreetMap. Navigate, explore, and discover with Tempest Maps.",
+    keywords: [
+        "maps",
+        "navigation",
+        "openstreetmap",
+        "routing",
+        "geocoding",
+        "open-source",
+    ],
+    authors: [{ name: "Tempest Maps" }],
+    creator: "Tempest Maps",
+    manifest: "/manifest.json",
+    icons: {
+        icon: "/favicon.ico",
+        apple: "/apple-touch-icon.png",
+    },
+    openGraph: {
+        type: "website",
+        locale: "en_US",
+        title: "Tempest Maps",
+        description: "Open-source mapping platform powered by OpenStreetMap.",
+        siteName: "Tempest Maps",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "Tempest Maps",
+        description: "Open-source mapping platform powered by OpenStreetMap.",
+    },
 };
 
 export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#000000",
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    themeColor: [
+        { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+        { media: "(prefers-color-scheme: dark)", color: "#0a0f1a" },
+    ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    // No className="dark" here — dark is the default via :root CSS vars
-    // Light mode is triggered by adding html.light class in JS
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-      </head>
-      <body className="antialiased overflow-hidden">
-        {children}
-      </body>
-    </html>
-  );
+export default function RootLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <html lang="en" suppressHydrationWarning>
+            <body
+                className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased h-full`}
+            >
+                <ThemeProvider>
+                    <ToastProvider>
+                        {children}
+                    </ToastProvider>
+                </ThemeProvider>
+            </body>
+        </html>
+    );
 }
