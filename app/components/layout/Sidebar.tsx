@@ -1,31 +1,32 @@
 "use client";
-// src/components/layout/Sidebar.tsx
+// app/components/layout/Sidebar.tsx
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Map, Search, Navigation, Bookmark, Settings,
-    ChevronLeft, ChevronRight, Layers, Star,
+    Search, Bookmark, Settings,
+    ChevronLeft, ChevronRight, Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/features/search/components/SearchBar";
 import { SearchResults } from "@/features/search/components/SearchResults";
 import { useSearchStore } from "@/store/searchStore";
-import { SidebarBrand } from "@/components/layout/SidebarBrand";
-import { QuickActions } from "@/components/layout/QuickActions";
+import { SidebarBrand } from "@/app/components/layout/SidebarBrand";
+import { QuickActions } from "@/app/components/layout/QuickActions";
 
 type SidebarTab = "search" | "saved" | "settings";
 
 export function Sidebar() {
     const [collapsed, setCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState<SidebarTab>("search");
-    const { isOpen: searchOpen, results, query } = useSearchStore();
+    const { isOpen: searchOpen, results, query, isSearching } = useSearchStore();
 
-    const showResults = searchOpen && (results.length > 0 || query.length > 0);
+    const showResults =
+        searchOpen && (results.length > 0 || query.length > 0 || isSearching);
 
     return (
-        <div className="h-full flex pointer-events-auto">
-            {/* ── Main sidebar panel ── */}
+        <div className="h-full flex pointer-events-auto select-none">
+            {/* Panel */}
             <AnimatePresence initial={false} mode="wait">
                 {!collapsed && (
                     <motion.div
@@ -37,10 +38,9 @@ export function Sidebar() {
                         className="h-full overflow-hidden"
                     >
                         <div className="w-[360px] h-full flex flex-col glass border-r border-border/50">
-                            {/* Brand header */}
                             <SidebarBrand />
 
-                            {/* Tab nav */}
+                            {/* Tabs */}
                             <div className="flex items-center gap-1 px-3 pb-3 border-b border-border/40">
                                 {(
                                     [
@@ -68,51 +68,34 @@ export function Sidebar() {
                                 ))}
                             </div>
 
-                            {/* Tab content */}
+                            {/* Content */}
                             <div className="flex-1 overflow-hidden flex flex-col">
                                 {activeTab === "search" && (
                                     <div className="flex-1 overflow-hidden flex flex-col">
-                                        {/* Search input */}
                                         <div className="px-3 pt-3 pb-2">
                                             <SearchBar />
                                         </div>
-
-                                        {/* Results or quick actions */}
                                         <div className="flex-1 overflow-y-auto scrollbar-thin">
-                                            {showResults ? (
-                                                <SearchResults />
-                                            ) : (
-                                                <QuickActions />
-                                            )}
+                                            {showResults ? <SearchResults /> : <QuickActions />}
                                         </div>
                                     </div>
                                 )}
-
-                                {activeTab === "saved" && (
-                                    <SavedPlaceholderTab />
-                                )}
-
-                                {activeTab === "settings" && (
-                                    <SettingsPlaceholderTab />
-                                )}
+                                {activeTab === "saved" && <SavedPlaceholderTab />}
+                                {activeTab === "settings" && <SettingsPlaceholderTab />}
                             </div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* ── Collapse toggle ── */}
+            {/* Collapse toggle */}
             <div className="flex items-center">
                 <motion.button
                     onClick={() => setCollapsed((c) => !c)}
                     whileTap={{ scale: 0.9 }}
                     aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    className={cn(
-                        "glass rounded-r-2xl w-5 h-12 flex items-center justify-center",
-                        "text-muted-foreground hover:text-foreground transition-colors",
-                        "border-l-0"
-                    )}
-                    style={{ borderRadius: "0 12px 12px 0" }}
+                    className="glass w-5 h-12 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ borderRadius: "0 12px 12px 0", borderLeft: "none" }}
                 >
                     {collapsed ? (
                         <ChevronRight className="w-3 h-3" />
@@ -152,9 +135,7 @@ function SettingsPlaceholderTab() {
             </div>
             <div>
                 <p className="text-sm font-medium text-foreground">Settings</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                    Available in Phase 11
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">Available in Phase 11</p>
             </div>
         </div>
     );

@@ -1,118 +1,163 @@
 "use client";
-// src/features/search/hooks/useSearch.ts
+// features/search/hooks/useSearch.ts
 
 import { useCallback, useEffect, useRef } from "react";
 import { useSearchStore } from "@/store/searchStore";
-import { searchPlaces } from "@/features/search/services/geocodingService";
+import { useMapStore } from "@/store/mapStore";
+import { searchPlaces, reverseGeocode } from "@/features/search/services/geocodingService";
 import type { GeocodingResult } from "@/types/map";
 
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
 
 export function useSearch() {
-  const {
-    query, setQuery, setResults, setIsSearching,
-    setIsOpen, setError, setSelectedResult,
-    addRecentSearch, results, isSearching, isOpen,
-    selectedResult, recentSearches,
-  } = useSearchStore();
+  const store = useSearchStore();
+  const { flyTo, setSelectedPlace, mapInstance } = useMapStore();
 
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const performSearch = useCallback(async (q: string) => {
-    if (q.length < MIN_QUERY_LENGTH) {
-      setResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // Cancel previous request
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
-    abortRef.current = new AbortController();
-
-    setIsSearching(true);
-    setError(null);
-
-    try {
-      const results = await searchPlaces(q, { limit: 8 });
-      setResults(results);
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setError((err as Error).message);
-        setResults([]);
+  // Core search
+  const performSearch = useCallback(
+    async (q: string) => {
+      if (q.trim().length < MIN_QUERY_LENGTH) {
+        store.setResults([]);
+        store.setIsSearching(false);
+        return;
       }
-    } finally {
-      setIsSearching(false);
-    }
-  }, [setResults, setIsSearching, setError]);
 
-  const handleQueryChange = useCallback((value: string) => {
-    setQuery(value);
-    setIsOpen(true);
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
 
-    // Clear existing debounce
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+      store.setIsSearching(true);
+      store.setError(null);
 
-    if (!value.trim()) {
-      setResults([]);
-      setIsSearching(false);
-      return;
-    }
+      try {
+        const results = await searchPlaces(q, { limit: 8 });
+        store.setResults(results);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          store.setError((err as Error).message);
+          store.setResults([]);
+        }
+      } finally {
+        store.setIsSearching(false);
+      }
+    },
+    [store]
+  );
 
-    // Debounce the actual search
-    debounceRef.current = setTimeout(() => {
-      performSearch(value);
-    }, DEBOUNCE_MS);
-  }, [setQuery, setIsOpen, setResults, setIsSearching, performSearch]);
+  // Debounced query change
+  const handleQueryChange = useCallback(
+    (value: string) => {
+      store.setQuery(value);
+      store.setIsOpen(true);
 
-  const handleSelectResult = useCallback((result: GeocodingResult) => {
-    setSelectedResult(result);
-    addRecentSearch(result);
-    setIsOpen(false);
-    setQuery(result.name);
-  }, [setSelectedResult, addRecentSearch, setIsOpen, setQuery]);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
 
+      if (!value.trim()) {
+        store.setResults([]);
+        store.setIsSearching(false);
+        return;
+      }
+
+      debounceRef.current = setTimeout(() => {
+        performSearch(value);
+      }, DEBOUNCE_MS);
+    },
+    [store, performSearch]
+  );
+
+  // Select a result
+  const handleSelectResult = useCallback(
+    (result: GeocodingResult) => {
+      store.setSelectedResult(result);
+      store.addRecentSearch(result);
+      store.setIsOpen(false);
+      store.setQuery(result.name);
+    },
+    [store]
+  );
+
+  // Clear
   const handleClear = useCallback(() => {
-    setQuery("");
-    setResults([]);
-    setSelectedResult(null);
-    setIsOpen(false);
-    setError(null);
+    store.setQuery("");
+    store.setResults([]);
+    store.setSelectedResult(null);
+    store.setIsOpen(false);
+    store.setError(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (abortRef.current) abortRef.current.abort();
-  }, [setQuery, setResults, setSelectedResult, setIsOpen, setError]);
+    abortRef.current?.abort();
+  }, [store]);
 
   const handleFocus = useCallback(() => {
-    setIsOpen(true);
-  }, [setIsOpen]);
+    store.setIsOpen(true);
+  }, [store]);
 
   const handleBlur = useCallback(() => {
-    // Delay close so clicks on results can register
-    setTimeout(() => setIsOpen(false), 200);
-  }, [setIsOpen]);
+    setTimeout(() => store.setIsOpen(false), 200);
+  }, [store]);
 
-  // Cleanup on unmount
+  // Reverse geocode on map click (Phase 2 feature)
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const handleClick = async (e: maplibregl.MapMouseEvent) => {
+      const { lng, lat } = e.lngLat;
+
+      // Don't interfere if actively searching
+      if (store.query.trim()) return;
+
+      try {
+        const result = await reverseGeocode({ lng, lat });
+        if (result) {
+          setSelectedPlace(result);
+          store.setQuery(result.name);
+        } else {
+          // No result — show coordinate pin
+          const coordResult: GeocodingResult = {
+            id: `click-${lat}-${lng}`,
+            name: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+            displayName: `${lat.toFixed(6)}°, ${lng.toFixed(6)}°`,
+            category: "Coordinates",
+            address: `${Math.abs(lat).toFixed(6)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lng).toFixed(6)}°${lng >= 0 ? "E" : "W"}`,
+            coordinates: { lng, lat },
+          };
+          setSelectedPlace(coordResult);
+        }
+      } catch {
+        // Silently fail on map click reverse geocode
+      }
+    };
+
+    mapInstance.on("click", handleClick);
+    return () => {
+      mapInstance.off("click", handleClick);
+    };
+  }, [mapInstance, store, setSelectedPlace]);
+
+  // Cleanup
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (abortRef.current) abortRef.current.abort();
+      abortRef.current?.abort();
     };
   }, []);
 
   return {
-    query,
-    results,
-    isSearching,
-    isOpen,
-    selectedResult,
-    recentSearches,
+    query: store.query,
+    results: store.results,
+    isSearching: store.isSearching,
+    isOpen: store.isOpen,
+    selectedResult: store.selectedResult,
+    recentSearches: store.recentSearches,
     handleQueryChange,
     handleSelectResult,
     handleClear,
     handleFocus,
     handleBlur,
+    // Expose for keyboard nav in SearchBar
+    setSelectedPlace,
+    flyTo,
   };
 }

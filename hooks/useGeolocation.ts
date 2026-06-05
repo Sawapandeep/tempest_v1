@@ -1,7 +1,7 @@
-// src/hooks/useGeolocation.ts
 "use client";
+// hooks/useGeolocation.ts
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { useMapStore } from "@/store/mapStore";
 import { MAP_CONFIG } from "@/lib/map-config";
 import type { UserLocation } from "@/types/map";
@@ -17,19 +17,101 @@ interface GeolocationOptions {
 export function useGeolocation(options: GeolocationOptions = {}) {
   const {
     enableHighAccuracy = true,
-    timeout = 10000,
-    maximumAge = 5000,
+    timeout = 15000,
+    maximumAge = 0,
     onSuccess,
     onError,
   } = options;
 
   const watchIdRef = useRef<number | null>(null);
-  const { setUserLocation, setIsLocating, setLocationError, flyTo, setIsFollowingUser } =
-    useMapStore();
+  const {
+    setUserLocation,
+    setIsLocating,
+    setLocationError,
+    flyTo,
+    setIsFollowingUser,
+    mapInstance,
+    isMapLoaded,
+  } = useMapStore();
+
+  const handlePosition = useCallback(
+    (position: GeolocationPosition) => {
+      const location: UserLocation = {
+        coordinates: {
+          lng: position.coords.longitude,
+          lat: position.coords.latitude,
+        },
+        accuracy: position.coords.accuracy,
+        heading: position.coords.heading ?? undefined,
+        speed: position.coords.speed ?? undefined,
+        timestamp: position.timestamp,
+      };
+      setUserLocation(location);
+      setIsLocating(false);
+      setLocationError(null);
+
+      // Wait for map to be ready before flying
+      const doFly = () => {
+        flyTo(location.coordinates, MAP_CONFIG.GEOLOCATION_ZOOM);
+      };
+
+      if (mapInstance && isMapLoaded) {
+        doFly();
+      } else {
+        // Retry after short delay for mobile where map may still be loading
+        setTimeout(doFly, 600);
+      }
+
+      onSuccess?.(location);
+    },
+    [setUserLocation, setIsLocating, setLocationError, flyTo, mapInstance, isMapLoaded, onSuccess]
+  );
+
+  const handleError = useCallback(
+    (error: GeolocationPositionError) => {
+      let message: string;
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          message =
+            "Location access denied. Please enable location permissions in your browser settings.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          message =
+            "Location unavailable. Ensure GPS is enabled on your device.";
+          break;
+        case error.TIMEOUT:
+          message = "Location request timed out. Please try again.";
+          break;
+        default:
+          message = `Location error: ${error.message}`;
+      }
+      setLocationError(message);
+      setIsLocating(false);
+      setIsFollowingUser(false);
+      onError?.(message);
+    },
+    [setLocationError, setIsLocating, setIsFollowingUser, onError]
+  );
 
   const locate = useCallback(() => {
+    if (typeof window === "undefined") return;
+
     if (!navigator.geolocation) {
-      const msg = "Geolocation is not supported by your browser";
+      const msg =
+        "Geolocation is not supported by your browser or device.";
+      setLocationError(msg);
+      onError?.(msg);
+      return;
+    }
+
+    // On iOS 16+ in non-secure context geolocation is blocked — warn clearly
+    if (
+      typeof window !== "undefined" &&
+      window.location.protocol !== "https:" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
+    ) {
+      const msg = "Location requires a secure connection (HTTPS).";
       setLocationError(msg);
       onError?.(msg);
       return;
@@ -38,45 +120,37 @@ export function useGeolocation(options: GeolocationOptions = {}) {
     setIsLocating(true);
     setLocationError(null);
 
+    // First try with high accuracy, fall back to low accuracy on failure
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location: UserLocation = {
-          coordinates: {
-            lng: position.coords.longitude,
-            lat: position.coords.latitude,
-          },
-          accuracy: position.coords.accuracy,
-          heading: position.coords.heading ?? undefined,
-          speed: position.coords.speed ?? undefined,
-          timestamp: position.timestamp,
-        };
-        setUserLocation(location);
-        setIsLocating(false);
-        flyTo(location.coordinates, MAP_CONFIG.GEOLOCATION_ZOOM);
-        onSuccess?.(location);
-      },
-      (error) => {
-        let message: string;
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            message = "Location access denied. Please enable permissions.";
-            break;
-          case error.POSITION_UNAVAILABLE:
-            message = "Location information is unavailable.";
-            break;
-          case error.TIMEOUT:
-            message = "Location request timed out.";
-            break;
-          default:
-            message = "An unknown error occurred.";
+      handlePosition,
+      (err) => {
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+          // Retry with lower accuracy for better mobile compat
+          navigator.geolocation.getCurrentPosition(
+            handlePosition,
+            handleError,
+            {
+              enableHighAccuracy: false,
+              timeout: 10000,
+              maximumAge: 30000,
+            }
+          );
+        } else {
+          handleError(err);
         }
-        setLocationError(message);
-        setIsLocating(false);
-        onError?.(message);
       },
       { enableHighAccuracy, timeout, maximumAge }
     );
-  }, [enableHighAccuracy, timeout, maximumAge, setUserLocation, setIsLocating, setLocationError, flyTo, onSuccess, onError]);
+  }, [
+    enableHighAccuracy,
+    timeout,
+    maximumAge,
+    handlePosition,
+    handleError,
+    setIsLocating,
+    setLocationError,
+    onError,
+  ]);
 
   const startWatching = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -98,12 +172,12 @@ export function useGeolocation(options: GeolocationOptions = {}) {
         };
         setUserLocation(location);
       },
-      (error) => {
-        console.error("Watch position error:", error);
+      (err) => {
+        console.warn("Watch position error:", err.message);
       },
-      { enableHighAccuracy, maximumAge: 1000 }
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
     );
-  }, [enableHighAccuracy, setUserLocation, setIsFollowingUser]);
+  }, [setUserLocation, setIsFollowingUser]);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -112,6 +186,16 @@ export function useGeolocation(options: GeolocationOptions = {}) {
       setIsFollowingUser(false);
     }
   }, [setIsFollowingUser]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, []);
 
   return { locate, startWatching, stopWatching };
 }

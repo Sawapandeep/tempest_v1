@@ -1,33 +1,35 @@
 "use client";
-// src/components/layout/MapShell.tsx
+// app/components/layout/MapShell.tsx
 
 import { AnimatePresence, motion } from "framer-motion";
-import { MapCanvas } from "@/components/map/MapCanvas";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { MapControls } from "@/components/map/MapControls";
-import { LayerSwitcher } from "@/components/map/LayerSwitcher";
-import { ScaleIndicator } from "@/components/map/ScaleIndicator";
+import { MapCanvas } from "@/app/components/map/MapCanvas";
+import { Sidebar } from "@/app/components/layout/Sidebar";
+import { MapControls } from "@/app/components/map/MapControls";
+import { LayerSwitcher } from "@/app/components/map/LayerSwitcher";
+import { ScaleIndicator } from "@/app/components/map/ScaleIndicator";
 import { SearchBar } from "@/features/search/components/SearchBar";
-import { MobileBottomSheet } from "@/components/layout/MobileBottomSheet";
-import { PlaceDetailPanel } from "@/components/map/PlaceDetailPanel";
-import { SelectedPlaceMarker } from "@/components/map/SelectedPlaceMarker";
+import { SearchDropdown } from "@/features/search/components/SearchDropdown";
+import { MobileBottomSheet } from "@/app/components/layout/MobileBottomSheet";
+import { PlaceDetailPanel } from "@/app/components/map/PlaceDetailPanel";
+import { SelectedPlaceMarker } from "@/app/components/map/SelectedPlaceMarker";
 import { useMapStore } from "@/store/mapStore";
+import { useSearchStore } from "@/store/searchStore";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export function MapShell() {
   const isMapLoaded = useMapStore((s) => s.isMapLoaded);
   const selectedPlace = useMapStore((s) => s.selectedPlace);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const { isOpen: searchOpen, query, results } = useSearchStore();
+  const showSearchDropdown = !isMobile && searchOpen && (query.length > 0 || results.length > 0);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
-      {/* Map Canvas */}
+      {/* ── Map ── */}
       <MapCanvas />
-
-      {/* Selected place map marker */}
       <SelectedPlaceMarker />
 
-      {/* Desktop Sidebar */}
+      {/* ── Desktop Sidebar ── */}
       {!isMobile && (
         <AnimatePresence>
           <motion.aside
@@ -43,14 +45,21 @@ export function MapShell() {
         </AnimatePresence>
       )}
 
-      {/* Mobile Search Bar */}
+      {/* ── Mobile Search Bar (top) ── */}
       {isMobile && (
-        <div className="absolute top-3 left-3 right-3 z-30 pointer-events-auto">
+        <div className="absolute top-3 left-3 right-16 z-30 pointer-events-auto">
           <SearchBar compact />
         </div>
       )}
 
-      {/* Map Controls */}
+      {/* ── Mobile Layers button (top-right) ── */}
+      {isMobile && (
+        <div className="absolute top-3 right-3 z-30 pointer-events-auto">
+          <LayerSwitcher />
+        </div>
+      )}
+
+      {/* ── Map Controls (right side) ── */}
       <div
         className={`absolute z-20 flex flex-col gap-2 pointer-events-auto ${isMobile ? "right-3 bottom-36" : "right-4 bottom-10"
           }`}
@@ -58,18 +67,20 @@ export function MapShell() {
         <MapControls />
       </div>
 
-      {/* Layer Switcher — desktop only */}
+      {/* ── Layer Switcher (desktop bottom-left) ── */}
       {!isMobile && (
         <div className="absolute bottom-6 left-[376px] z-20 pointer-events-auto">
           <LayerSwitcher />
         </div>
       )}
 
-      {/* Place Detail Panel */}
+      {/* ── Place Detail Panel ── */}
       <AnimatePresence>
         {selectedPlace && (
           <div
-            className={`absolute z-25 pointer-events-auto ${isMobile ? "bottom-24 left-3 right-3" : "bottom-20 left-[376px]"
+            className={`absolute pointer-events-auto z-30 ${isMobile
+                ? "bottom-24 left-3 right-3"
+                : "bottom-20 left-[376px]"
               }`}
           >
             <PlaceDetailPanel />
@@ -77,7 +88,7 @@ export function MapShell() {
         )}
       </AnimatePresence>
 
-      {/* Scale Indicator */}
+      {/* ── Scale Indicator ── */}
       <div
         className={`absolute z-10 pointer-events-none ${isMobile ? "bottom-28 left-3" : "bottom-6 right-28"
           }`}
@@ -85,14 +96,14 @@ export function MapShell() {
         <ScaleIndicator />
       </div>
 
-      {/* Mobile Bottom Sheet */}
+      {/* ── Mobile Bottom Sheet ── */}
       {isMobile && (
-        <div className="absolute bottom-0 left-0 right-0 z-30">
+        <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-auto">
           <MobileBottomSheet />
         </div>
       )}
 
-      {/* Map load fade overlay */}
+      {/* ── Map load fade ── */}
       <AnimatePresence>
         {!isMapLoaded && (
           <motion.div
