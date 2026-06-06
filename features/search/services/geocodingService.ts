@@ -1,17 +1,26 @@
-// src/features/search/services/geocodingService.ts
-
+// features/search/services/geocodingService.ts
 import type { GeocodingResult, Coordinates } from "@/types/map";
 
-const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
+// ---------------------------------------------------------------------------
+// Coordinate pattern: "lat, lng" or "lat lng"
+// Accepts optional degree symbols and N/S/E/W suffixes
+// ---------------------------------------------------------------------------
+const COORD_RE =
+  /^(-?\d{1,3}(?:\.\d+)?)[°\s,]+\s*(-?\d{1,3}(?:\.\d+)?)[°]?(?:\s*[NSns])?(?:\s*[EWew])?$/;
 
-const HEADERS = {
-  "Accept-Language": "en",
-  "User-Agent": "TempestMaps/1.0 (open-source mapping platform)",
-};
+function parseCoordinateQuery(query: string): { lat: number; lng: number } | null {
+  const match = query.trim().match(COORD_RE);
+  if (!match) return null;
+  const lat = parseFloat(match[1]);
+  const lng = parseFloat(match[2]);
+  if (isNaN(lat) || isNaN(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng };
+}
 
-/**
- * Forward geocoding — text → coordinates
- */
+// ---------------------------------------------------------------------------
+// Forward geocoding — proxied through /api/geocode to avoid CORS & rate limits
+// ---------------------------------------------------------------------------
 export async function searchPlaces(
   query: string,
   options: {
@@ -21,94 +30,68 @@ export async function searchPlaces(
     bounded?: boolean;
   } = {}
 ): Promise<GeocodingResult[]> {
-  const { limit = 8, countrycodes, viewbox, bounded } = options;
+  const trimmed = query.trim();
+  if (!trimmed) return [];
 
-  if (!query.trim()) return [];
-
-  // Detect coordinate input like "40.7128, -74.0060" or "40.7128 -74.0060"
-  const coordMatch = query.match(
-    /^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/
-  );
-  if (coordMatch) {
-    const lat = parseFloat(coordMatch[1]);
-    const lng = parseFloat(coordMatch[2]);
-    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      return [
-        {
-          id: `coord-${lat}-${lng}`,
-          name: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-          displayName: `Coordinates: ${lat.toFixed(6)}°, ${lng.toFixed(6)}°`,
-          category: "coordinates",
-          address: `${lat.toFixed(6)}°N, ${lng.toFixed(6)}°E`,
-          coordinates: { lat, lng },
-        },
-      ];
-    }
+  // Fast-path: raw coordinate input
+  const coords = parseCoordinateQuery(trimmed);
+  if (coords) {
+    return [
+      {
+        id: `coord-${coords.lat.toFixed(6)}-${coords.lng.toFixed(6)}`,
+        name: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+        displayName: `Coordinates: ${coords.lat.toFixed(6)}°, ${coords.lng.toFixed(6)}°`,
+        category: "Coordinates",
+        address: `${Math.abs(coords.lat).toFixed(6)}°${coords.lat >= 0 ? "N" : "S"}, ${Math.abs(coords.lng).toFixed(6)}°${coords.lng >= 0 ? "E" : "W"}`,
+        coordinates: coords,
+      },
+    ];
   }
+
+  const { limit = 8, countrycodes, viewbox } = options;
 
   const params = new URLSearchParams({
-    q: query,
-    format: "jsonv2",
-    addressdetails: "1",
-    extratags: "1",
-    namedetails: "1",
-    limit: String(limit),
-    dedupe: "1",
+    mode: "forward",
+    q: trimmed,
+    limit: String(Math.min(limit, 12)),
   });
-
   if (countrycodes) params.set("countrycodes", countrycodes);
   if (viewbox) params.set("viewbox", viewbox);
-  if (bounded) params.set("bounded", "1");
 
-  try {
-    const res = await fetch(
-      `${NOMINATIM_BASE}/search?${params.toString()}`,
-      {
-        headers: HEADERS,
-        signal: AbortSignal.timeout(8000),
-      }
-    );
+  const res = await fetch(`/api/geocode?${params.toString()}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
 
-    if (!res.ok) throw new Error(`Nominatim error: ${res.status}`);
-
-    const data: NominatimResult[] = await res.json();
-    return data.map(nominatimToResult);
-  } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      throw new Error("Search timed out");
-    }
-    throw err;
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Too many requests — please slow down.");
+    throw new Error(`Search failed (${res.status})`);
   }
+
+  const data: NominatimResult[] = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data.map(nominatimToResult);
 }
 
-/**
- * Reverse geocoding — coordinates → address
- */
+// ---------------------------------------------------------------------------
+// Reverse geocoding
+// ---------------------------------------------------------------------------
 export async function reverseGeocode(
   coords: Coordinates
 ): Promise<GeocodingResult | null> {
   const params = new URLSearchParams({
+    mode: "reverse",
     lat: String(coords.lat),
-    lon: String(coords.lng),
-    format: "jsonv2",
-    addressdetails: "1",
-    extratags: "1",
-    zoom: "18",
+    lng: String(coords.lng),
   });
 
   try {
-    const res = await fetch(
-      `${NOMINATIM_BASE}/reverse?${params.toString()}`,
-      {
-        headers: HEADERS,
-        signal: AbortSignal.timeout(8000),
-      }
-    );
-
+    const res = await fetch(`/api/geocode?${params.toString()}`, {
+      signal: AbortSignal.timeout(8_000),
+    });
     if (!res.ok) return null;
 
-    const data: NominatimResult = await res.json();
-    if (!data || (data as { error?: string }).error) return null;
+    const data: NominatimResult & { error?: string } = await res.json();
+    if (!data || data.error) return null;
 
     return nominatimToResult(data);
   } catch {
@@ -116,13 +99,15 @@ export async function reverseGeocode(
   }
 }
 
-/**
- * Get place details by OSM type+id
- */
+// ---------------------------------------------------------------------------
+// OSM Lookup by ID (used for place details in later phases)
+// ---------------------------------------------------------------------------
 export async function lookupPlace(
   osmType: "N" | "W" | "R",
   osmId: number
 ): Promise<GeocodingResult | null> {
+  // Direct Nominatim lookup — server-side proxying not needed for this low-frequency call
+  const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
   const params = new URLSearchParams({
     osm_ids: `${osmType}${osmId}`,
     format: "jsonv2",
@@ -131,23 +116,24 @@ export async function lookupPlace(
   });
 
   try {
-    const res = await fetch(
-      `${NOMINATIM_BASE}/lookup?${params.toString()}`,
-      { headers: HEADERS }
-    );
+    const res = await fetch(`${NOMINATIM_BASE}/lookup?${params.toString()}`, {
+      headers: {
+        "User-Agent": "TempestMaps/1.0 (open-source mapping platform)",
+        "Accept-Language": "en",
+      },
+    });
     if (!res.ok) return null;
-
     const data: NominatimResult[] = await res.json();
     if (!data?.length) return null;
-
     return nominatimToResult(data[0]);
   } catch {
     return null;
   }
 }
 
-// ─── Nominatim types ──────────────────────────────────────────
-
+// ---------------------------------------------------------------------------
+// Types & normalisation
+// ---------------------------------------------------------------------------
 interface NominatimResult {
   place_id: number;
   osm_type?: string;
@@ -180,14 +166,16 @@ interface NominatimResult {
     email?: string;
     brand?: string;
   };
-  boundingbox?: [string, string, string, string]; // [minlat, maxlat, minlon, maxlon]
+  boundingbox?: [string, string, string, string];
 }
 
 function nominatimToResult(item: NominatimResult): GeocodingResult {
   const addr = item.address;
+
   const shortAddress = [
     addr?.road,
     addr?.suburb ?? addr?.city ?? addr?.town ?? addr?.village,
+    addr?.state,
     addr?.country,
   ]
     .filter(Boolean)
@@ -204,7 +192,7 @@ function nominatimToResult(item: NominatimResult): GeocodingResult {
 
   return {
     id: `osm-${item.place_id}`,
-    name: item.name || item.display_name.split(",")[0],
+    name: item.name || item.display_name.split(",")[0].trim(),
     displayName: item.display_name,
     category: formatCategory(item.category ?? item.class ?? item.type),
     address: shortAddress || item.display_name,

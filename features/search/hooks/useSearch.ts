@@ -1,11 +1,15 @@
-"use client";
 // features/search/hooks/useSearch.ts
+"use client";
 
 import { useCallback, useEffect, useRef } from "react";
 import { useSearchStore } from "@/store/searchStore";
 import { useMapStore } from "@/store/mapStore";
-import { searchPlaces, reverseGeocode } from "@/features/search/services/geocodingService";
+import {
+  searchPlaces,
+  reverseGeocode,
+} from "@/features/search/services/geocodingService";
 import type { GeocodingResult } from "@/types/map";
+import type { MapMouseEvent } from "maplibre-gl";
 
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LENGTH = 2;
@@ -17,7 +21,9 @@ export function useSearch() {
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ----------------------------------------------------------
   // Core search
+  // ----------------------------------------------------------
   const performSearch = useCallback(
     async (q: string) => {
       if (q.trim().length < MIN_QUERY_LENGTH) {
@@ -36,7 +42,8 @@ export function useSearch() {
         const results = await searchPlaces(q, { limit: 8 });
         store.setResults(results);
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
+        const name = (err as Error).name;
+        if (name !== "AbortError" && name !== "TimeoutError") {
           store.setError((err as Error).message);
           store.setResults([]);
         }
@@ -47,7 +54,9 @@ export function useSearch() {
     [store]
   );
 
-  // Debounced query change
+  // ----------------------------------------------------------
+  // Handlers
+  // ----------------------------------------------------------
   const handleQueryChange = useCallback(
     (value: string) => {
       store.setQuery(value);
@@ -68,7 +77,6 @@ export function useSearch() {
     [store, performSearch]
   );
 
-  // Select a result
   const handleSelectResult = useCallback(
     (result: GeocodingResult) => {
       store.setSelectedResult(result);
@@ -79,7 +87,6 @@ export function useSearch() {
     [store]
   );
 
-  // Clear
   const handleClear = useCallback(() => {
     store.setQuery("");
     store.setResults([]);
@@ -95,28 +102,31 @@ export function useSearch() {
   }, [store]);
 
   const handleBlur = useCallback(() => {
+    // Delay so clicks on results still register
     setTimeout(() => store.setIsOpen(false), 200);
   }, [store]);
 
-  // Reverse geocode on map click (Phase 2 feature)
+  // ----------------------------------------------------------
+  // Reverse geocode on map click (Phase 2)
+  // ----------------------------------------------------------
   useEffect(() => {
     if (!mapInstance) return;
 
-    const handleClick = async (e: maplibregl.MapMouseEvent) => {
+    const handleClick = async (e: MapMouseEvent) => {
       const { lng, lat } = e.lngLat;
 
-      // Don't interfere if actively searching
-      if (store.query.trim()) return;
+      // Don't steal focus from an active search
+      if (useSearchStore.getState().query.trim()) return;
 
       try {
         const result = await reverseGeocode({ lng, lat });
+
         if (result) {
           setSelectedPlace(result);
-          store.setQuery(result.name);
         } else {
-          // No result — show coordinate pin
+          // Fallback: pin the raw coordinates
           const coordResult: GeocodingResult = {
-            id: `click-${lat}-${lng}`,
+            id: `click-${lat.toFixed(6)}-${lng.toFixed(6)}`,
             name: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
             displayName: `${lat.toFixed(6)}°, ${lng.toFixed(6)}°`,
             category: "Coordinates",
@@ -126,7 +136,7 @@ export function useSearch() {
           setSelectedPlace(coordResult);
         }
       } catch {
-        // Silently fail on map click reverse geocode
+        // Silently ignore click errors
       }
     };
 
@@ -134,9 +144,11 @@ export function useSearch() {
     return () => {
       mapInstance.off("click", handleClick);
     };
-  }, [mapInstance, store, setSelectedPlace]);
+  }, [mapInstance, setSelectedPlace]);
 
-  // Cleanup
+  // ----------------------------------------------------------
+  // Cleanup on unmount
+  // ----------------------------------------------------------
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -156,7 +168,6 @@ export function useSearch() {
     handleClear,
     handleFocus,
     handleBlur,
-    // Expose for keyboard nav in SearchBar
     setSelectedPlace,
     flyTo,
   };

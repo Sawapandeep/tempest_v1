@@ -1,12 +1,17 @@
 "use client";
-// src/components/map/MapCanvas.tsx
+// app/components/map/MapCanvas.tsx
 
 import { useEffect, useRef, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import { useMapStore } from "@/store/mapStore";
 import { useSettingsStore } from "@/store/settingsStore";
-import { DEFAULT_VIEW_STATE, DEFAULT_DARK_STYLE, DEFAULT_LIGHT_STYLE, MAP_CONFIG } from "@/lib/map-config";
-import { UserLocationMarker } from "@/components/map/UserLocationMarker";
+import {
+  DEFAULT_VIEW_STATE,
+  DEFAULT_DARK_STYLE,
+  DEFAULT_LIGHT_STYLE,
+  MAP_CONFIG,
+} from "@/lib/map-config";
+import { UserLocationMarker } from "@/app/components/map/UserLocationMarker";
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,7 +28,6 @@ export function MapCanvas() {
 
   const theme = useSettingsStore((s) => s.theme);
 
-  // Resolve style based on theme setting
   const resolveStyle = useCallback(() => {
     if (activeStyleUrl) return activeStyleUrl;
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -31,7 +35,7 @@ export function MapCanvas() {
     return isDark ? DEFAULT_DARK_STYLE : DEFAULT_LIGHT_STYLE;
   }, [activeStyleUrl, theme]);
 
-  // Initialize map
+  // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -50,7 +54,6 @@ export function MapCanvas() {
         compact: true,
         customAttribution: MAP_CONFIG.ATTRIBUTION,
       },
-      // Performance
       fadeDuration: 150,
       renderWorldCopies: true,
     });
@@ -58,7 +61,6 @@ export function MapCanvas() {
     mapRef.current = map;
     setMapInstance(map);
 
-    // Events
     map.on("load", () => {
       setIsMapLoaded(true);
     });
@@ -73,7 +75,7 @@ export function MapCanvas() {
       });
     });
 
-    // Fullscreen change
+    // Track fullscreen state
     const handleFullscreen = () => {
       useMapStore.getState().setIsFullscreen(!!document.fullscreenElement);
     };
@@ -89,7 +91,7 @@ export function MapCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update style when activeStyleUrl changes
+  // Update style when layer/theme changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -110,7 +112,7 @@ export function MapCanvas() {
   return (
     <div className="absolute inset-0 w-full h-full" aria-label="Interactive map">
       <div ref={containerRef} className="w-full h-full" />
-      {/* Overlay components that need map context */}
+      {/* Overlay markers rendered via React portals into the map */}
       <UserLocationMarker />
     </div>
   );
