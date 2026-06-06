@@ -1,6 +1,6 @@
 "use client";
 // app/components/map/PlaceDetailPanel.tsx
-
+import { useMapStore } from "@/store/mapStore";
 import { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -538,17 +538,28 @@ function PlaceDetailPanelContent() {
 // ─────────────────────────────────────────────────────────────
 // Export — wraps in AnimatePresence for mount/unmount animation
 // ─────────────────────────────────────────────────────────────
-export const PlaceDetailPanel = memo(function PlaceDetailPanel() {
-    const selectedPlace = (() => {
-        // read from mapStore directly to decide show/hide
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const { useMapStore } = require("@/store/mapStore");
-        return useMapStore((s: { selectedPlace: unknown }) => s.selectedPlace);
-    })();
+// export const PlaceDetailPanel = memo(function PlaceDetailPanel() {
+//     const selectedPlace = (() => {
+//         // read from mapStore directly to decide show/hide
+//         // eslint-disable-next-line react-hooks/rules-of-hooks
+//         const { useMapStore } = require("@/store/mapStore");
+//         return useMapStore((s: { selectedPlace: unknown }) => s.selectedPlace);
+//     })();
+
+//     return (
+//         <AnimatePresence>
+//             {selectedPlace && <PlaceDetailPanelContent />}
+//         </AnimatePresence>
+//     );
+// });
+export function PlaceDetailPanel() {
+    const selectedPlace = useMapStore(
+        (state) => state.selectedPlace
+    );
 
     return (
-        <AnimatePresence>
-            {selectedPlace && <PlaceDetailPanelContent />}
-        </AnimatePresence>
+        <div>
+            {selectedPlace?.name}
+        </div>
     );
-});
+}
