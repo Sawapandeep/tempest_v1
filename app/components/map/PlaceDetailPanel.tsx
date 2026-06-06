@@ -1,8 +1,8 @@
 "use client";
 // app/components/map/PlaceDetailPanel.tsx
-
 import { useMapStore } from "@/store/mapStore";
-import { useState } from "react";
+import { useRouteStore } from "@/store/routeStore";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     X, MapPin, Navigation, Copy, ExternalLink, Bookmark,
@@ -13,9 +13,10 @@ import { cn, formatCoordinates } from "@/lib/utils";
 import { usePlaceDetails } from "@/features/places/hooks/usePlaceDetails";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useToast } from "@/app/components/ui/ToastProvider";
+import { generateId } from "@/lib/utils";
 import type { PlaceDetails } from "@/types/place";
 
-/* ─── sub-components ──────────────────────────────────────────── */
+// ── Sub-components ───────────────────────────────────────────────────────────
 
 function PlaceSkeleton() {
     return (
@@ -117,14 +118,8 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
                         transition={{ delay: i * 0.06 }}
                         onClick={() => setViewIdx(i)}
                         className="shrink-0 w-20 h-14 rounded-xl overflow-hidden border border-border/30 hover:border-tempest-500/50 transition-colors"
-                        aria-label={`View photo ${i + 1}`}
                     >
-                        <img
-                            src={photo.thumb ?? photo.url}
-                            alt={photo.caption ?? `Photo ${i + 1}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                        />
+                        <img src={photo.thumb ?? photo.url} alt={photo.caption ?? `Photo ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                     </motion.button>
                 ))}
             </div>
@@ -138,11 +133,7 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
                         className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4"
                         onClick={() => setViewIdx(null)}
                     >
-                        <button
-                            className="absolute top-4 right-4 text-white/80 hover:text-white"
-                            onClick={() => setViewIdx(null)}
-                            aria-label="Close photo"
-                        >
+                        <button className="absolute top-4 right-4 text-white/80 hover:text-white" onClick={() => setViewIdx(null)}>
                             <X className="w-6 h-6" />
                         </button>
                         <motion.div
@@ -152,11 +143,7 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
                             onClick={(e) => e.stopPropagation()}
                             className="max-w-2xl w-full"
                         >
-                            <img
-                                src={photos[viewIdx].url}
-                                alt={photos[viewIdx].caption ?? ""}
-                                className="w-full rounded-2xl"
-                            />
+                            <img src={photos[viewIdx].url} alt={photos[viewIdx].caption ?? ""} className="w-full rounded-2xl" />
                             {photos[viewIdx].caption && (
                                 <p className="text-white/70 text-xs text-center mt-2">{photos[viewIdx].caption}</p>
                             )}
@@ -184,13 +171,11 @@ function DetailRow({
     const inner = (
         <div className={cn("flex items-start gap-2.5 group", (href || onClick) && "cursor-pointer")}>
             <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0 group-hover:text-tempest-400 transition-colors" />
-            <span
-                className={cn(
-                    "text-xs text-muted-foreground group-hover:text-foreground transition-colors flex-1 leading-relaxed",
-                    monospace && "font-mono",
-                    (href || onClick) && "group-hover:text-tempest-300 underline-offset-2 group-hover:underline"
-                )}
-            >
+            <span className={cn(
+                "text-xs text-muted-foreground group-hover:text-foreground transition-colors flex-1 leading-relaxed",
+                monospace && "font-mono",
+                (href || onClick) && "group-hover:text-tempest-300 underline-offset-2 group-hover:underline"
+            )}>
                 {children}
             </span>
         </div>
@@ -200,7 +185,7 @@ function DetailRow({
     return inner;
 }
 
-/* ─── main export ─────────────────────────────────────────────── */
+// ── Main Component ──────────────────────────────────────────────────────────
 
 interface PlaceDetailPanelProps {
     onGetDirections?: () => void;
@@ -209,9 +194,39 @@ interface PlaceDetailPanelProps {
 export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
     const { details, loadState, dismiss } = usePlaceDetails();
     const selectedPlace = useMapStore((s) => s.selectedPlace);
+    const userLocation = useMapStore((s) => s.userLocation);
     const { toast } = useToast();
     const isMobile = useMediaQuery("(max-width: 768px)");
     const [descExpanded, setDescExpanded] = useState(false);
+
+    // ── Directions: pre-fill route store then open panel ──────────────────────
+    const handleGetDirections = useCallback(() => {
+        const dest = details ?? selectedPlace;
+        if (!dest) return;
+
+        const routeStore = useRouteStore.getState();
+
+        // Set destination from this place
+        routeStore.setDestination({
+            id: generateId(),
+            label: dest.name,
+            coordinates: dest.coordinates,
+            type: "destination",
+        });
+
+        // Auto-set origin from current location if available
+        if (userLocation) {
+            routeStore.setOrigin({
+                id: generateId(),
+                label: "My Location",
+                coordinates: userLocation.coordinates,
+                type: "origin",
+            });
+        }
+
+        // Open routing panel via callback
+        onGetDirections?.();
+    }, [details, selectedPlace, userLocation, onGetDirections]);
 
     if (!selectedPlace) return null;
 
@@ -249,14 +264,13 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
             : `https://${details.contact.website}`
         : undefined;
 
-    const hasOpeningHours = !!details?.openingHours;
     const hasPhotos = (details?.photos?.length ?? 0) > 0;
     const hasDesc = !!details?.description;
-    const MAX_DESC = 140;
 
+    const MAX_DESC = 140;
     const displayName = details?.name ?? selectedPlace?.name ?? "Selected place";
-    const displayCategory = details?.category ?? selectedPlace?.category;
-    const displayAddress = details?.address ?? selectedPlace?.address;
+    const displayCat = details?.category ?? selectedPlace?.category;
+    const displayAddr = details?.address ?? selectedPlace?.address;
 
     return (
         <motion.div
@@ -265,10 +279,7 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 12, opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-            className={cn(
-                "glass rounded-2xl overflow-hidden",
-                isMobile ? "w-full" : "max-w-sm w-full"
-            )}
+            className={cn("glass rounded-2xl overflow-hidden", isMobile ? "w-full" : "max-w-sm w-full")}
             role="complementary"
             aria-label={`Place details for ${displayName}`}
         >
@@ -287,9 +298,7 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
                         ) : (
                             <>
                                 <h2 className="text-sm font-semibold text-foreground leading-snug">{displayName}</h2>
-                                {displayCategory && (
-                                    <p className="text-[11px] text-tempest-400/80 mt-0.5 capitalize">{displayCategory}</p>
-                                )}
+                                {displayCat && <p className="text-[11px] text-tempest-400/80 mt-0.5 capitalize">{displayCat}</p>}
                                 {details?.rating !== undefined && (
                                     <div className="mt-1">
                                         <StarRating rating={details.rating} count={details.reviewCount} />
@@ -298,11 +307,7 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
                             </>
                         )}
                     </div>
-                    <button
-                        onClick={dismiss}
-                        className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5 focus-visible:outline-none"
-                        aria-label="Close place details"
-                    >
+                    <button onClick={dismiss} className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5" aria-label="Close">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -322,25 +327,18 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
                     )}
 
                     <div className="px-4 py-3 space-y-2.5">
-                        {displayAddress && (
-                            <DetailRow icon={MapPin} onClick={copyAddress}>{displayAddress}</DetailRow>
-                        )}
-                        {coords && (
-                            <DetailRow icon={Copy} onClick={copyCoords} monospace>{formattedCoords}</DetailRow>
-                        )}
+                        {displayAddr && <DetailRow icon={MapPin} onClick={copyAddress}>{displayAddr}</DetailRow>}
+                        {coords && <DetailRow icon={Copy} onClick={copyCoords} monospace>{formattedCoords}</DetailRow>}
                         {details?.contact?.phone && (
                             <DetailRow icon={Phone} href={`tel:${details.contact.phone}`}>{details.contact.phone}</DetailRow>
                         )}
                         {websiteUrl && (
                             <DetailRow icon={Globe} href={websiteUrl}>{details!.contact!.website}</DetailRow>
                         )}
-                        {hasOpeningHours && (
+                        {details?.openingHours && (
                             <div className="flex items-start gap-2.5">
                                 <Clock className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                                <OpenStatusBadge
-                                    openNow={details!.openingHours!.openNow}
-                                    raw={details!.openingHours!.raw}
-                                />
+                                <OpenStatusBadge openNow={details.openingHours.openNow} raw={details.openingHours.raw} />
                             </div>
                         )}
                         {hasDesc && (
@@ -354,10 +352,7 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
                                                 : `${details!.description!.slice(0, MAX_DESC)}…`}
                                         </p>
                                         {details!.description!.length > MAX_DESC && (
-                                            <button
-                                                onClick={() => setDescExpanded((e) => !e)}
-                                                className="text-[10px] text-tempest-400 hover:text-tempest-300 mt-1 transition-colors"
-                                            >
+                                            <button onClick={() => setDescExpanded((e) => !e)} className="text-[10px] text-tempest-400 hover:text-tempest-300 mt-1 transition-colors">
                                                 {descExpanded ? "Show less" : "Read more"}
                                             </button>
                                         )}
@@ -366,20 +361,17 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
                             </div>
                         )}
                         {selectedPlace?.id.startsWith("osm-") && coords && (
-                            <DetailRow
-                                icon={ExternalLink}
-                                href={`https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}`}
-                            >
+                            <DetailRow icon={ExternalLink} href={`https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}`}>
                                 View on OpenStreetMap
                             </DetailRow>
                         )}
                     </div>
 
-                    {/* Action buttons */}
+                    {/* Actions */}
                     <div className="px-4 pb-4 flex gap-2">
                         <motion.button
                             whileTap={{ scale: 0.96 }}
-                            onClick={onGetDirections}
+                            onClick={handleGetDirections}
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl",
                                 "text-xs font-medium bg-tempest-500 text-white",
@@ -390,46 +382,37 @@ export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
                             <Navigation2 className="w-3.5 h-3.5" />
                             Directions
                         </motion.button>
-
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             className={cn(
                                 "w-9 h-9 rounded-xl flex items-center justify-center",
-                                "bg-surface-subtle border border-border/50",
-                                "hover:bg-surface-elevated hover:border-tempest-500/40",
-                                "text-muted-foreground hover:text-tempest-400 transition-all",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                "bg-surface-subtle border border-border/50 hover:bg-surface-elevated hover:border-tempest-500/40",
+                                "text-muted-foreground hover:text-tempest-400 transition-all"
                             )}
                             aria-label="Save place"
                         >
                             <Bookmark className="w-4 h-4" />
                         </motion.button>
-
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             onClick={sharePlace}
                             className={cn(
                                 "w-9 h-9 rounded-xl flex items-center justify-center",
-                                "bg-surface-subtle border border-border/50",
-                                "hover:bg-surface-elevated",
-                                "text-muted-foreground hover:text-foreground transition-all",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                "bg-surface-subtle border border-border/50 hover:bg-surface-elevated",
+                                "text-muted-foreground hover:text-foreground transition-all"
                             )}
-                            aria-label="Share place"
+                            aria-label="Share"
                         >
                             <Share2 className="w-4 h-4" />
                         </motion.button>
-
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             className={cn(
                                 "w-9 h-9 rounded-xl flex items-center justify-center",
-                                "bg-surface-subtle border border-border/50",
-                                "hover:bg-surface-elevated",
-                                "text-muted-foreground hover:text-foreground transition-all",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                "bg-surface-subtle border border-border/50 hover:bg-surface-elevated",
+                                "text-muted-foreground hover:text-foreground transition-all"
                             )}
-                            aria-label="Report a problem"
+                            aria-label="Report"
                         >
                             <Flag className="w-4 h-4" />
                         </motion.button>

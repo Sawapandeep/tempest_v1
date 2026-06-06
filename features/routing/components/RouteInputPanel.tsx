@@ -1,6 +1,5 @@
 "use client";
 // features/routing/components/RouteInputPanel.tsx
-
 import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,12 +17,13 @@ import { generateId } from "@/lib/utils";
 
 const PROFILE_ICONS: Record<RouteProfile, React.ElementType> = {
     driving: Car,
-    motorcycle: Bike,     // motorbike icon
+    motorcycle: Bike,
     walking: Footprints,
     cycling: Bike,
     bus: Car,
 };
 
+// ── Waypoint input with inline autocomplete ──────────────────────────────────
 interface WaypointInputProps {
     value: string;
     placeholder: string;
@@ -31,6 +31,7 @@ interface WaypointInputProps {
     onSearch: (q: string) => void;
     onSelect: (r: GeocodingResult) => void;
     onCurrentLocation?: () => void;
+    isLocatingCurrent?: boolean;
     autoFocus?: boolean;
 }
 
@@ -41,6 +42,7 @@ function WaypointInput({
     onSearch,
     onSelect,
     onCurrentLocation,
+    isLocatingCurrent,
     autoFocus,
 }: WaypointInputProps) {
     const [localQuery, setLocalQuery] = useState(value);
@@ -98,11 +100,13 @@ function WaypointInput({
                         className="shrink-0 text-muted-foreground hover:text-tempest-400 transition-colors"
                         aria-label="Use current location"
                     >
-                        <LocateFixed className="w-3.5 h-3.5" />
+                        {isLocatingCurrent
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin text-tempest-400" />
+                            : <LocateFixed className="w-3.5 h-3.5" />
+                        }
                     </button>
                 )}
             </div>
-
             <AnimatePresence>
                 {showDropdown && (
                     <motion.div
@@ -126,9 +130,7 @@ function WaypointInput({
                                     <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium text-foreground truncate">{r.name}</p>
-                                        {r.address && (
-                                            <p className="text-xs text-muted-foreground truncate mt-0.5">{r.address}</p>
-                                        )}
+                                        {r.address && <p className="text-xs text-muted-foreground truncate mt-0.5">{r.address}</p>}
                                     </div>
                                 </button>
                             ))
@@ -140,6 +142,7 @@ function WaypointInput({
     );
 }
 
+// ── Main Panel ───────────────────────────────────────────────────────────────
 interface RouteInputPanelProps {
     onClose: () => void;
     initialDestinationName?: string;
@@ -154,15 +157,42 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
         setDestinationFromPlace,
         setProfile, swapWaypoints,
     } = useRouting();
+
     const { userLocation } = useMapStore();
 
     const [originLabel, setOriginLabel] = useState(origin?.label ?? "");
     const [destLabel, setDestLabel] = useState(destination?.label ?? initialDestinationName ?? "");
+    const [isLocatingOrigin, setIsLocatingOrigin] = useState(false);
 
+    // ── Current location button: request geo if not available ────────────────
     const handleUseCurrentLocation = useCallback(() => {
-        if (!userLocation) return;
-        setOriginFromCoords(userLocation.coordinates, "My Location");
-        setOriginLabel("My Location");
+        // Already have it
+        if (userLocation) {
+            setOriginFromCoords(userLocation.coordinates, "My Location");
+            setOriginLabel("My Location");
+            return;
+        }
+        // Request it now
+        if (!navigator.geolocation) return;
+        setIsLocatingOrigin(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const coords = { lng: pos.coords.longitude, lat: pos.coords.latitude };
+                // Also update global map store
+                useMapStore.getState().setUserLocation({
+                    coordinates: coords,
+                    accuracy: pos.coords.accuracy,
+                    heading: pos.coords.heading ?? undefined,
+                    speed: pos.coords.speed ?? undefined,
+                    timestamp: pos.timestamp,
+                });
+                setOriginFromCoords(coords, "My Location");
+                setOriginLabel("My Location");
+                setIsLocatingOrigin(false);
+            },
+            () => setIsLocatingOrigin(false),
+            { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 }
+        );
     }, [userLocation, setOriginFromCoords]);
 
     const handleSwap = () => {
@@ -186,12 +216,12 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
             <div className="flex items-center gap-2 px-4 pt-4 pb-3">
                 <Navigation2 className="w-4 h-4 text-tempest-400 shrink-0" />
                 <span className="text-sm font-semibold text-foreground flex-1">Get Directions</span>
-                <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close directions">
+                <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close">
                     <X className="w-4 h-4" />
                 </button>
             </div>
 
-            {/* Transport mode tabs */}
+            {/* Profile selector */}
             <div className="flex gap-1 px-4 pb-3 overflow-x-auto no-scrollbar">
                 {ROUTE_PROFILES.map((p) => {
                     const Icon = PROFILE_ICONS[p.id];
@@ -215,9 +245,9 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                 })}
             </div>
 
-            {/* Waypoint inputs */}
+            {/* Inputs */}
             <div className="px-4 pb-3 flex gap-2">
-                {/* Route line dots */}
+                {/* Connector line */}
                 <div className="flex flex-col items-center pt-2.5 pb-2.5 gap-0 shrink-0">
                     <Circle className="w-3 h-3 text-emerald-400 fill-emerald-400" />
                     <div className="flex-1 w-px bg-border/50 my-1 min-h-[20px]" />
@@ -232,6 +262,7 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                         onSearch={setOriginLabel}
                         onSelect={(r) => { setOriginFromPlace(r); setOriginLabel(r.name); }}
                         onCurrentLocation={handleUseCurrentLocation}
+                        isLocatingCurrent={isLocatingOrigin}
                         autoFocus={!origin}
                     />
                     <WaypointInput
@@ -243,7 +274,7 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                     />
                 </div>
 
-                {/* Swap button */}
+                {/* Swap */}
                 <div className="flex items-center pb-0.5 shrink-0">
                     <motion.button
                         whileTap={{ scale: 0.88 }}
@@ -270,7 +301,7 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                 )}
             </AnimatePresence>
 
-            {/* Calculate button */}
+            {/* CTA */}
             <div className="px-4 pb-4">
                 <motion.button
                     whileTap={{ scale: 0.97 }}

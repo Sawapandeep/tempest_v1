@@ -2,7 +2,6 @@
 import type { GeocodingResult, Coordinates } from "@/types/map";
 import { isWithinIndia, INDIA_BOUNDS } from "@/lib/map-config";
 
-// ─── Coordinate parser ────────────────────────────────────────────────────────
 const COORD_RE =
   /^(-?\d{1,3}(?:\.\d+)?)[°\s,]+\s*(-?\d{1,3}(?:\.\d+)?)[°]?(?:\s*[NSns])?(?:\s*[EWew])?$/;
 
@@ -16,10 +15,14 @@ function parseCoordinateQuery(query: string): { lat: number; lng: number } | nul
   return { lat, lng };
 }
 
-// ─── Viewbox for Nominatim biasing — covers all of India ─────────────────────
 const INDIA_VIEWBOX = `${INDIA_BOUNDS.west},${INDIA_BOUNDS.north},${INDIA_BOUNDS.east},${INDIA_BOUNDS.south}`;
 
-// ─── Main search ──────────────────────────────────────────────────────────────
+/**
+ * Search with India-bounded Nominatim, with automatic fallback:
+ * 1. bounded=1 (strict India)
+ * 2. bounded=0 + countrycodes=in (relaxed, handles typos better)
+ * 3. namedetails + dedupe=0 (broadest)
+ */
 export async function searchPlaces(
   query: string,
   options: {
@@ -31,7 +34,7 @@ export async function searchPlaces(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  // Coordinate input — validate it's within India
+  // Coordinate shortcut
   const coords = parseCoordinateQuery(trimmed);
   if (coords) {
     if (!isWithinIndia(coords.lng, coords.lat)) {
@@ -56,38 +59,60 @@ export async function searchPlaces(
 
   const { limit = 8 } = options;
 
-  const params = new URLSearchParams({
-    mode:         "forward",
-    q:            trimmed,
-    limit:        String(Math.min(limit, 12)),
-    countrycodes: "in",                   // ← India only
-    viewbox:      INDIA_VIEWBOX,          // ← bias to India bbox
-    bounded:      "1",                    // ← hard-restrict to viewbox
-  });
+  // ── Pass 1: bounded India search ─────────────────────────────────────────
+  let results = await nominatimSearch(trimmed, limit, true);
+  if (results.length > 0) return results;
 
-  const res = await fetch(`/api/geocode?${params.toString()}`, {
-    signal: AbortSignal.timeout(10_000),
-  });
+  // ── Pass 2: unbounded India search (handles spelling variants better) ──
+  results = await nominatimSearch(trimmed, limit, false);
+  if (results.length > 0) return results;
 
-  if (!res.ok) {
-    if (res.status === 429) throw new Error("Too many requests — please slow down.");
-    throw new Error(`Search failed (${res.status})`);
+  // ── Pass 3: If still empty, try a fuzzy prefix match by stripping last word
+  //    e.g. "sachpass" → try "sach" which may match "Sach Pass"
+  const words = trimmed.split(/\s+/);
+  if (words.length === 1 && trimmed.length > 4) {
+    const prefix = trimmed.slice(0, Math.ceil(trimmed.length * 0.75));
+    results = await nominatimSearch(prefix, limit, false);
+    if (results.length > 0) return results;
   }
 
-  const data: NominatimResult[] = await res.json();
-  if (!Array.isArray(data)) return [];
-
-  // Extra client-side filter — drop anything clearly outside India
-  return data
-    .map(nominatimToResult)
-    .filter((r) => isWithinIndia(r.coordinates.lng, r.coordinates.lat));
+  return [];
 }
 
-// ─── Reverse geocode ──────────────────────────────────────────────────────────
+async function nominatimSearch(
+  q: string,
+  limit: number,
+  bounded: boolean
+): Promise<GeocodingResult[]> {
+  const params = new URLSearchParams({
+    mode:         "forward",
+    q,
+    limit:        String(Math.min(limit, 12)),
+    bounded:      bounded ? "1" : "0",
+  });
+
+  try {
+    const res = await fetch(`/api/geocode?${params.toString()}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Too many requests — please slow down.");
+      throw new Error(`Search failed (${res.status})`);
+    }
+    const data: NominatimResult[] = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data
+      .map(nominatimToResult)
+      .filter((r) => isWithinIndia(r.coordinates.lng, r.coordinates.lat));
+  } catch (err) {
+    if ((err as Error).name === "AbortError" || (err as Error).name === "TimeoutError") return [];
+    throw err;
+  }
+}
+
 export async function reverseGeocode(
   coords: Coordinates
 ): Promise<GeocodingResult | null> {
-  // Reject coordinates outside India immediately
   if (!isWithinIndia(coords.lng, coords.lat)) return null;
 
   const params = new URLSearchParams({
@@ -109,7 +134,6 @@ export async function reverseGeocode(
   }
 }
 
-// ─── OSM lookup by ID ─────────────────────────────────────────────────────────
 export async function lookupPlace(
   osmType: "N" | "W" | "R",
   osmId: number
@@ -121,7 +145,6 @@ export async function lookupPlace(
     addressdetails:"1",
     extratags:     "1",
   });
-
   try {
     const res = await fetch(`${NOMINATIM_BASE}/lookup?${params.toString()}`, {
       headers: {
@@ -140,7 +163,7 @@ export async function lookupPlace(
   }
 }
 
-// ─── Nominatim → GeocodingResult ─────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────
 interface NominatimResult {
   place_id: number;
   osm_type?: string;

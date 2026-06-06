@@ -1,6 +1,5 @@
 "use client";
 // app/components/layout/MapShell.tsx
-
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MapCanvas } from "@/app/components/map/MapCanvas";
@@ -23,29 +22,36 @@ export function MapShell() {
   const isMapLoaded = useMapStore((s) => s.isMapLoaded);
   const selectedPlace = useMapStore((s) => s.selectedPlace);
   const isMobile = useMediaQuery("(max-width: 768px)");
+
   const { isOpen: searchOpen, query, results, isSearching } = useSearchStore();
-  const isPanelOpen = useRouteStore((s) => s.isPanelOpen);
+
   const [showRoutingPanel, setShowRoutingPanel] = useState(false);
+
+  // Remember the destination name when user clicks "Directions" from a place card
+  const [routingDestName, setRoutingDestName] = useState<string | undefined>();
 
   const showMobileSearchDropdown =
     isMobile && searchOpen && (query.length > 0 || results.length > 0 || isSearching);
 
-  const openRouting = () => setShowRoutingPanel(true);
+  const openRouting = (destName?: string) => {
+    setRoutingDestName(destName);
+    setShowRoutingPanel(true);
+  };
+
   const closeRouting = () => {
     setShowRoutingPanel(false);
+    setRoutingDestName(undefined);
     useRouteStore.getState().clearRoute();
   };
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
-      {/* Map layer */}
+      {/* Map */}
       <MapCanvas />
       <SelectedPlaceMarker />
-
-      {/* Route polyline layer — mounts after map is ready */}
       <RouteCanvas />
 
-      {/* ── Desktop sidebar ── */}
+      {/* Desktop sidebar */}
       {!isMobile && (
         <AnimatePresence>
           <motion.aside
@@ -56,12 +62,12 @@ export function MapShell() {
             transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
             className="absolute left-0 top-0 h-full w-[360px] z-20 pointer-events-none"
           >
-            <Sidebar onOpenRouting={openRouting} />
+            <Sidebar onOpenRouting={() => openRouting()} />
           </motion.aside>
         </AnimatePresence>
       )}
 
-      {/* ── Mobile search bar + dropdown ── */}
+      {/* Mobile search bar */}
       {isMobile && (
         <div className="absolute top-3 left-3 right-3 z-30 pointer-events-auto">
           <SearchBar compact />
@@ -83,15 +89,12 @@ export function MapShell() {
         </div>
       )}
 
-      {/* ── Map controls (right side) ── */}
-      <div
-        className={`absolute z-20 flex flex-col gap-2 pointer-events-auto ${isMobile ? "right-3 bottom-36" : "right-4 bottom-10"
-          }`}
-      >
+      {/* Map controls */}
+      <div className={`absolute z-20 flex flex-col gap-2 pointer-events-auto ${isMobile ? "right-3 bottom-36" : "right-4 bottom-10"}`}>
         <MapControls />
       </div>
 
-      {/* ── Routing panel (desktop: left sidebar area; mobile: top) ── */}
+      {/* Routing panel */}
       <AnimatePresence>
         {showRoutingPanel && (
           <motion.div
@@ -100,46 +103,42 @@ export function MapShell() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-            className={`absolute pointer-events-auto z-40 ${isMobile
-                ? "top-20 left-3 right-3"
-                : "top-4 left-[376px] w-[360px]"
+            className={`absolute pointer-events-auto z-40 ${isMobile ? "top-20 left-3 right-3" : "top-4 left-[376px] w-[360px]"
               }`}
           >
-            <RoutingPanel onClose={closeRouting} />
+            <RoutingPanel
+              onClose={closeRouting}
+              initialDestinationName={routingDestName}
+            />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Place detail panel ── */}
+      {/* Place detail panel */}
       <AnimatePresence>
         {selectedPlace && !showRoutingPanel && (
-          <div
-            className={`absolute pointer-events-auto z-30 ${isMobile
-                ? "bottom-24 left-3 right-3"
-                : "bottom-20 left-[376px]"
-              }`}
-          >
-            <PlaceDetailPanel onGetDirections={openRouting} />
+          <div className={`absolute pointer-events-auto z-30 ${isMobile ? "bottom-24 left-3 right-3" : "bottom-20 left-[376px]"
+            }`}>
+            <PlaceDetailPanel
+              onGetDirections={() => openRouting(selectedPlace.name)}
+            />
           </div>
         )}
       </AnimatePresence>
 
-      {/* ── Scale indicator ── */}
-      <div
-        className={`absolute z-10 pointer-events-none ${isMobile ? "bottom-28 left-3" : "bottom-6 right-28"
-          }`}
-      >
+      {/* Scale indicator */}
+      <div className={`absolute z-10 pointer-events-none ${isMobile ? "bottom-28 left-3" : "bottom-6 right-28"}`}>
         <ScaleIndicator />
       </div>
 
-      {/* ── Mobile bottom sheet ── */}
+      {/* Mobile bottom sheet */}
       {isMobile && (
         <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-auto">
           <MobileBottomSheet />
         </div>
       )}
 
-      {/* ── Map loading fade overlay ── */}
+      {/* Map loading overlay */}
       <AnimatePresence>
         {!isMapLoaded && (
           <motion.div

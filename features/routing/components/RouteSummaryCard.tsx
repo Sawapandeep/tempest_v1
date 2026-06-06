@@ -1,12 +1,11 @@
 "use client";
 // features/routing/components/RouteSummaryCard.tsx
-
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Car, Footprints, Bike, Clock, Route,
     ChevronDown, ChevronUp, AlertTriangle,
     Anchor, DollarSign, ArrowLeft, Navigation2,
-    RefreshCw, Info,
+    RefreshCw, Info, Play, StopCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +16,7 @@ import {
 } from "@/features/routing/lib/routeConfig";
 import { useRouting } from "@/features/routing/hooks/useRouting";
 import type { RouteProfile } from "@/types/routing";
+import { useRouteStore } from "@/store/routeStore";
 
 const PROFILE_ICONS: Record<RouteProfile, React.ElementType> = {
     driving: Car,
@@ -67,6 +67,77 @@ function RouteAlternativeTab({ index, route, isActive, onClick }: RouteAlternati
     );
 }
 
+// ── Navigation banner shown during active navigation ─────────────────────────
+function NavigationBanner() {
+    const { activeRoute, activeStepIndex, activeProfile } = useRouting();
+    const isNavigating = useRouteStore((s) => s.isNavigating);
+    const setIsNavigating = useRouteStore((s) => s.setIsNavigating);
+    const setStep = useRouteStore((s) => s.setActiveStepIndex);
+
+    if (!isNavigating || !activeRoute) return null;
+
+    const steps = activeRoute.maneuvers;
+    const step = steps[activeStepIndex];
+    const isLast = activeStepIndex >= steps.length - 1;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mx-4 mb-3 rounded-2xl overflow-hidden bg-tempest-500/10 border border-tempest-500/30"
+        >
+            {/* Current step */}
+            <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-9 h-9 rounded-xl bg-tempest-500 flex items-center justify-center shrink-0">
+                    <Navigation2 className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
+                        {step?.instruction ?? "Arrive at destination"}
+                    </p>
+                    {step?.streetName && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{step.streetName}</p>
+                    )}
+                </div>
+                <div className="shrink-0 text-right">
+                    <p className="text-xs font-medium text-tempest-400">{step ? formatDistance(step.distance) : ""}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {activeStepIndex + 1} / {steps.length}
+                    </p>
+                </div>
+            </div>
+
+            {/* Step navigation */}
+            <div className="flex gap-2 px-4 pb-3">
+                <button
+                    disabled={activeStepIndex === 0}
+                    onClick={() => setStep(activeStepIndex - 1)}
+                    className="flex-1 h-8 rounded-xl bg-surface-subtle border border-border/50 text-xs font-medium text-muted-foreground disabled:opacity-40 hover:bg-surface-elevated transition-all"
+                >
+                    ← Prev
+                </button>
+                {isLast ? (
+                    <button
+                        onClick={() => setIsNavigating(false)}
+                        className="flex-1 h-8 rounded-xl bg-red-500/20 border border-red-500/30 text-xs font-medium text-red-400 hover:bg-red-500/30 transition-all flex items-center justify-center gap-1"
+                    >
+                        <StopCircle className="w-3.5 h-3.5" /> End
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => setStep(activeStepIndex + 1)}
+                        className="flex-1 h-8 rounded-xl bg-tempest-500/20 border border-tempest-500/30 text-xs font-medium text-tempest-400 hover:bg-tempest-500/30 transition-all"
+                    >
+                        Next →
+                    </button>
+                )}
+            </div>
+        </motion.div>
+    );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 interface RouteSummaryCardProps {
     onBack: () => void;
     onShowDirections: () => void;
@@ -75,21 +146,29 @@ interface RouteSummaryCardProps {
 
 export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }: RouteSummaryCardProps) {
     const {
-        routes,
-        activeRoute,
-        activeRouteIndex,
-        activeProfile,
-        origin,
-        destination,
-        isRouting,
-        setActiveRouteIndex,
-        setProfile,
+        routes, activeRoute, activeRouteIndex,
+        activeProfile, origin, destination,
+        isRouting, setActiveRouteIndex, setProfile,
     } = useRouting();
+
+    const isNavigating = useRouteStore((s) => s.isNavigating);
+    const setIsNavigating = useRouteStore((s) => s.setIsNavigating);
+    const setStep = useRouteStore((s) => s.setActiveStepIndex);
 
     if (!activeRoute && !isRouting) return null;
 
     const ProfileIcon = PROFILE_ICONS[activeProfile];
     const profileColor = PROFILE_COLORS[activeProfile];
+
+    const startNavigation = () => {
+        setStep(0);
+        setIsNavigating(true);
+    };
+
+    const stopNavigation = () => {
+        setIsNavigating(false);
+        setStep(0);
+    };
 
     return (
         <motion.div
@@ -99,13 +178,9 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
             transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
             className="glass rounded-2xl overflow-hidden"
         >
-            {/* Route header: back + breadcrumb */}
+            {/* Breadcrumb header */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-                <button
-                    onClick={onBack}
-                    className="text-muted-foreground hover:text-foreground transition-colors -ml-1 shrink-0"
-                    aria-label="Back to input"
-                >
+                <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors -ml-1 shrink-0">
                     <ArrowLeft className="w-4 h-4" />
                 </button>
                 <div className="flex-1 flex items-center gap-1 min-w-0 text-xs">
@@ -115,7 +190,7 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
                 </div>
             </div>
 
-            {/* Transport mode selector */}
+            {/* Profile tabs */}
             <div className="flex gap-1 px-4 pb-3">
                 {ROUTE_PROFILES.map((p) => {
                     const Icon = PROFILE_ICONS[p.id];
@@ -139,7 +214,7 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
                 })}
             </div>
 
-            {/* Loading state */}
+            {/* Loading */}
             {isRouting && (
                 <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -147,10 +222,15 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
                 </div>
             )}
 
-            {/* Route result */}
+            {/* Route info */}
             {!isRouting && activeRoute && (
                 <>
-                    {/* Main stats */}
+                    {/* Navigation banner */}
+                    <AnimatePresence>
+                        {isNavigating && <NavigationBanner />}
+                    </AnimatePresence>
+
+                    {/* Summary row */}
                     <div className="flex items-center gap-4 px-4 pb-3">
                         <div className="flex items-center gap-2">
                             <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-tempest-500/10 border border-tempest-500/20">
@@ -165,8 +245,6 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
                                 </p>
                             </div>
                         </div>
-
-                        {/* Badges */}
                         <div className="ml-auto flex gap-1.5 flex-wrap justify-end">
                             {activeRoute.summary?.hasToll && (
                                 <span className="flex items-center gap-1 text-[10px] bg-amber-400/10 text-amber-400 rounded-md px-2 py-1 font-medium">
@@ -181,7 +259,7 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
                         </div>
                     </div>
 
-                    {/* Alternative routes */}
+                    {/* Alternatives */}
                     {routes.length > 1 && (
                         <div className="flex gap-2 px-4 pb-3">
                             {routes.map((r, i) => (
@@ -197,19 +275,41 @@ export function RouteSummaryCard({ onBack, onShowDirections, isDirectionsOpen }:
                         </div>
                     )}
 
-                    {/* Actions */}
+                    {/* Action buttons */}
                     <div className="flex gap-2 px-4 pb-4">
+                        {/* Start / Stop navigation */}
+                        {isNavigating ? (
+                            <motion.button
+                                whileTap={{ scale: 0.96 }}
+                                onClick={stopNavigation}
+                                className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors"
+                            >
+                                <StopCircle className="w-4 h-4" /> Stop Navigation
+                            </motion.button>
+                        ) : (
+                            <motion.button
+                                whileTap={{ scale: 0.96 }}
+                                onClick={startNavigation}
+                                className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 transition-colors"
+                            >
+                                <Play className="w-4 h-4 fill-white" /> Start Navigation
+                            </motion.button>
+                        )}
+
+                        {/* Turn-by-turn toggle */}
                         <motion.button
-                            whileTap={{ scale: 0.96 }}
+                            whileTap={{ scale: 0.93 }}
                             onClick={onShowDirections}
-                            className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl bg-tempest-500 text-white text-sm font-medium hover:bg-tempest-600 transition-colors"
-                        >
-                            {isDirectionsOpen ? (
-                                <><ChevronUp className="w-3.5 h-3.5" /> Hide Steps</>
-                            ) : (
-                                <><Route className="w-3.5 h-3.5" /> Directions</>
+                            className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center",
+                                "bg-surface-subtle border border-border/50 hover:bg-surface-elevated transition-all",
+                                isDirectionsOpen ? "text-tempest-400 border-tempest-500/40" : "text-muted-foreground"
                             )}
+                            aria-label={isDirectionsOpen ? "Hide directions" : "Show directions"}
+                        >
+                            <Route className="w-4 h-4" />
                         </motion.button>
+
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             className="w-10 h-10 rounded-xl bg-surface-subtle border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"

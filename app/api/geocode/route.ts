@@ -4,26 +4,25 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "edge";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
-
-// ─── India bounds ─────────────────────────────────────────────────────────────
 const INDIA = { west: 68.0, east: 97.5, south: 6.5, north: 37.5 };
 
 function isWithinIndia(lat: number, lng: number): boolean {
-  return lat >= INDIA.south && lat <= INDIA.north &&
-         lng >= INDIA.west  && lng <= INDIA.east;
+  return (
+    lat >= INDIA.south && lat <= INDIA.north &&
+    lng >= INDIA.west  && lng <= INDIA.east
+  );
 }
 
-// ─── Simple in-memory rate limiter ───────────────────────────────────────────
+// Simple in-memory rate limiter (per IP, 60 req/min)
 const requestTimestamps = new Map<string, number[]>();
-
 function isRateLimited(ip: string): boolean {
-  const now       = Date.now();
-  const windowMs  = 60_000;
-  const maxReq    = 60;
-  const timestamps = (requestTimestamps.get(ip) ?? []).filter((t) => now - t < windowMs);
-  if (timestamps.length >= maxReq) return true;
-  timestamps.push(now);
-  requestTimestamps.set(ip, timestamps);
+  const now      = Date.now();
+  const windowMs = 60_000;
+  const maxReq   = 60;
+  const ts       = (requestTimestamps.get(ip) ?? []).filter((t) => now - t < windowMs);
+  if (ts.length >= maxReq) return true;
+  ts.push(now);
+  requestTimestamps.set(ip, ts);
   return false;
 }
 
@@ -33,7 +32,6 @@ const NOMINATIM_HEADERS = {
   "Accept":          "application/json",
 };
 
-// ─── Handler ──────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
   if (isRateLimited(ip)) {
@@ -43,30 +41,21 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("mode") ?? "forward";
 
-  // ── Reverse geocode ──────────────────────────────────────────────────────
+  // ── Reverse geocode ───────────────────────────────────────────────────────
   if (mode === "reverse") {
     const lat = searchParams.get("lat");
     const lng = searchParams.get("lng");
-
     if (!lat || !lng) {
       return NextResponse.json({ error: "lat and lng are required" }, { status: 400 });
     }
-
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
-
     if (isNaN(latNum) || isNaN(lngNum)) {
       return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
     }
-
-    // Block reverse geocoding outside India at the API level
     if (!isWithinIndia(latNum, lngNum)) {
-      return NextResponse.json(
-        { error: "Coordinates outside India" },
-        { status: 422 }
-      );
+      return NextResponse.json({ error: "Coordinates outside India" }, { status: 422 });
     }
-
     const params = new URLSearchParams({
       lat,
       lon:            lng,
@@ -75,7 +64,6 @@ export async function GET(req: NextRequest) {
       extratags:      "1",
       zoom:           "18",
     });
-
     try {
       const res = await fetch(`${NOMINATIM_BASE}/reverse?${params}`, {
         headers: NOMINATIM_HEADERS,
@@ -92,13 +80,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Forward geocode ──────────────────────────────────────────────────────
+  // ── Forward geocode ───────────────────────────────────────────────────────
   const q = searchParams.get("q");
-
   if (!q?.trim()) {
     return NextResponse.json({ error: "q parameter is required" }, { status: 400 });
   }
-
   const trimmed = q.trim();
   if (trimmed.length > 256) {
     return NextResponse.json({ error: "Query too long" }, { status: 400 });
@@ -107,7 +93,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? "8"), 12);
+  const limit   = Math.min(parseInt(searchParams.get("limit") ?? "8"), 12);
+  // bounded param comes from the client (1 = strict India, 0 = relaxed)
+  const bounded = searchParams.get("bounded") ?? "1";
 
   const params = new URLSearchParams({
     q:              trimmed,
@@ -117,10 +105,9 @@ export async function GET(req: NextRequest) {
     namedetails:    "1",
     limit:          String(limit),
     dedupe:         "1",
-    // ── India-lock params ──────────────────────────────────────────────────
     countrycodes:   "in",
     viewbox:        `${INDIA.west},${INDIA.north},${INDIA.east},${INDIA.south}`,
-    bounded:        "1",
+    bounded,
   });
 
   try {
