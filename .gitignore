@@ -45,4 +45,5 @@ next-env.d.ts
 
 #prompt files 
 prompts1.tsx
+prompts2.tsx
 prompts.tsx

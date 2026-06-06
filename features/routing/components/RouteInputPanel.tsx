@@ -1,20 +1,11 @@
 "use client";
 // features/routing/components/RouteInputPanel.tsx
 
-import { useRef, useState, useCallback, useId } from "react";
+import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    X,
-    ArrowUpDown,
-    MapPin,
-    Navigation2,
-    Car,
-    Footprints,
-    Bike,
-    Loader2,
-    Search,
-    LocateFixed,
-    Circle,
+    X, ArrowUpDown, MapPin, Navigation2,
+    Car, Footprints, Bike, Loader2, LocateFixed, Circle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouting } from "@/features/routing/hooks/useRouting";
@@ -33,12 +24,14 @@ const PROFILE_ICONS: Record<RouteProfile, React.ElementType> = {
     bus: Car,
 };
 
+/* ─── WaypointInput ─────────────────────────────────────────── */
+
 interface WaypointInputProps {
     value: string;
     placeholder: string;
     icon: React.ReactNode;
-    onSearch: (query: string) => void;
-    onSelect: (result: GeocodingResult) => void;
+    onSearch: (q: string) => void;
+    onSelect: (r: GeocodingResult) => void;
     onCurrentLocation?: () => void;
     autoFocus?: boolean;
 }
@@ -114,7 +107,6 @@ function WaypointInput({
                 )}
             </div>
 
-            {/* Dropdown */}
             <AnimatePresence>
                 {showDropdown && (
                     <motion.div
@@ -126,8 +118,7 @@ function WaypointInput({
                     >
                         {isSearching ? (
                             <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Searching…
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching…
                             </div>
                         ) : (
                             results.map((r) => (
@@ -153,6 +144,8 @@ function WaypointInput({
     );
 }
 
+/* ─── RouteInputPanel ───────────────────────────────────────── */
+
 interface RouteInputPanelProps {
     onClose: () => void;
     initialDestinationName?: string;
@@ -160,17 +153,12 @@ interface RouteInputPanelProps {
 
 export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputPanelProps) {
     const {
-        origin,
-        destination,
-        activeProfile,
-        isRouting,
-        error,
+        origin, destination,
+        activeProfile, isRouting, error,
         calculateRoute,
-        setOriginFromPlace,
-        setOriginFromCoords,
+        setOriginFromPlace, setOriginFromCoords,
         setDestinationFromPlace,
-        setProfile,
-        swapWaypoints,
+        setProfile, swapWaypoints,
     } = useRouting();
 
     const { userLocation } = useMapStore();
@@ -186,8 +174,9 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
 
     const handleSwap = () => {
         swapWaypoints();
+        const tmp = originLabel;
         setOriginLabel(destLabel);
-        setDestLabel(originLabel);
+        setDestLabel(tmp);
     };
 
     const canRoute = !!origin && !!destination;
@@ -213,7 +202,7 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                 </button>
             </div>
 
-            {/* Profile selector */}
+            {/* Mode selector */}
             <div className="flex gap-1 px-4 pb-3">
                 {ROUTE_PROFILES.map((p) => {
                     const Icon = PROFILE_ICONS[p.id];
@@ -239,15 +228,15 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
 
             {/* Waypoint inputs */}
             <div className="px-4 pb-3 flex gap-2">
-                {/* Connector line */}
-                <div className="flex flex-col items-center pt-2.5 pb-2.5 gap-0">
+                {/* Visual connector */}
+                <div className="flex flex-col items-center pt-2.5 pb-2.5 gap-0 shrink-0">
                     <Circle className="w-3 h-3 text-emerald-400 fill-emerald-400" />
                     <div className="flex-1 w-px bg-border/50 my-1 min-h-[20px]" />
                     <MapPin className="w-3 h-3 text-tempest-400 fill-tempest-400/30" />
                 </div>
 
                 {/* Inputs */}
-                <div className="flex-1 flex flex-col gap-2">
+                <div className="flex-1 flex flex-col gap-2 min-w-0">
                     <WaypointInput
                         value={originLabel}
                         placeholder="Your location"
@@ -267,7 +256,7 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                 </div>
 
                 {/* Swap button */}
-                <div className="flex items-center pb-0.5">
+                <div className="flex items-center pb-0.5 shrink-0">
                     <motion.button
                         whileTap={{ scale: 0.88 }}
                         onClick={handleSwap}
@@ -288,14 +277,12 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                         exit={{ opacity: 0, height: 0 }}
                         className="px-4 pb-2"
                     >
-                        <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">
-                            {error}
-                        </p>
+                        <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</p>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Action */}
+            {/* Calculate button */}
             <div className="px-4 pb-4">
                 <motion.button
                     whileTap={{ scale: 0.97 }}
@@ -309,15 +296,9 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                     )}
                 >
                     {isRouting ? (
-                        <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Calculating…
-                        </>
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Calculating…</>
                     ) : (
-                        <>
-                            <Navigation2 className="w-4 h-4" />
-                            {canRoute ? "Get Directions" : "Set Origin & Destination"}
-                        </>
+                        <><Navigation2 className="w-4 h-4" /> {canRoute ? "Get Directions" : "Set Origin & Destination"}</>
                     )}
                 </motion.button>
             </div>

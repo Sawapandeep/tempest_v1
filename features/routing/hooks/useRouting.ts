@@ -1,15 +1,12 @@
-// features/routing/hooks/useRouting.ts
 "use client";
+// features/routing/hooks/useRouting.ts
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouteStore } from "@/store/routeStore";
 import { useMapStore } from "@/store/mapStore";
 import { getRoute } from "@/features/routing/services/routingService";
 import {
-  addRouteLayer,
-  removeRouteLayer,
   fitMapToRoute,
-  updateActiveRoute,
 } from "@/features/routing/services/routeLayerService";
 import type { RouteProfile, RouteWaypoint } from "@/types/routing";
 import type { GeocodingResult } from "@/types/map";
@@ -18,20 +15,19 @@ import { generateId } from "@/lib/utils";
 export function useRouting() {
   const store = useRouteStore();
   const { mapInstance } = useMapStore();
-  const routingRef = useRef<AbortController | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // --------------------------------------------------------------------------
-  // Derive a route whenever origin/destination/profile change
-  // --------------------------------------------------------------------------
+  /** Core route calculation — called explicitly by the user */
   const calculateRoute = useCallback(async () => {
     const { origin, destination, activeProfile } = useRouteStore.getState();
     if (!origin || !destination) return;
 
-    routingRef.current?.abort();
-    routingRef.current = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
 
     store.setIsRouting(true);
     store.setError(null);
+    store.setRoutes([]);
 
     try {
       const routes = await getRoute({
@@ -47,14 +43,14 @@ export function useRouting() {
       store.setIsVisible(true);
       store.setIsPanelOpen(true);
 
-      // Render on map
-      if (mapInstance) {
-        addRouteLayer(mapInstance, routes, 0);
-        if (routes[0]) fitMapToRoute(mapInstance, routes[0]);
+      // Fit map to the best route
+      if (mapInstance && routes[0]) {
+        fitMapToRoute(mapInstance, routes[0]);
       }
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        store.setError((err as Error).message ?? "Failed to calculate route");
+      const e = err as Error;
+      if (e.name !== "AbortError" && e.name !== "TimeoutError") {
+        store.setError(e.message ?? "Failed to calculate route");
         store.setRoutes([]);
       }
     } finally {
@@ -62,118 +58,70 @@ export function useRouting() {
     }
   }, [store, mapInstance]);
 
-  // --------------------------------------------------------------------------
-  // Auto-recalculate when profile changes
-  // --------------------------------------------------------------------------
+  /** Re-calculate when user changes transport mode */
+  const prevProfile = useRef(store.activeProfile);
   useEffect(() => {
-    if (store.origin && store.destination) {
-      calculateRoute();
+    if (prevProfile.current !== store.activeProfile) {
+      prevProfile.current = store.activeProfile;
+      if (store.origin && store.destination) {
+        calculateRoute();
+      }
     }
-  }, [store.activeProfile]);
+  });
 
-  // --------------------------------------------------------------------------
-  // Re-render route on map instance changes
-  // --------------------------------------------------------------------------
-  useEffect(() => {
-    if (!mapInstance || !store.routes.length || !store.isVisible) return;
-
-    const onStyleLoad = () => {
-      addRouteLayer(mapInstance, store.routes, store.activeRouteIndex);
-    };
-
-    if (mapInstance.isStyleLoaded()) {
-      onStyleLoad();
-    } else {
-      mapInstance.once("styledata", onStyleLoad);
-    }
-
-    return () => {
-      mapInstance.off("styledata", onStyleLoad);
-    };
-  }, [mapInstance]);
-
-  // --------------------------------------------------------------------------
-  // Sync active route index → map
-  // --------------------------------------------------------------------------
+  /** Fit map when active route index changes */
   useEffect(() => {
     if (!mapInstance || !store.routes.length) return;
-    updateActiveRoute(mapInstance, store.routes, store.activeRouteIndex);
-    if (store.routes[store.activeRouteIndex]) {
-      fitMapToRoute(mapInstance, store.routes[store.activeRouteIndex]!);
-    }
+    const active = store.routes[store.activeRouteIndex];
+    if (active) fitMapToRoute(mapInstance, active);
   }, [store.activeRouteIndex, mapInstance]);
 
-  // --------------------------------------------------------------------------
-  // Cleanup on clear
-  // --------------------------------------------------------------------------
-  useEffect(() => {
-    if (!store.isVisible && mapInstance) {
-      removeRouteLayer(mapInstance);
-    }
-  }, [store.isVisible, mapInstance]);
+  /* ── waypoint helpers ─────────────────────────────────────── */
 
-  // --------------------------------------------------------------------------
-  // Public API
-  // --------------------------------------------------------------------------
   const setOriginFromPlace = useCallback(
     (place: GeocodingResult) => {
-      const wp: RouteWaypoint = {
+      store.setOrigin({
         id: generateId(),
         label: place.name,
         coordinates: place.coordinates,
         type: "origin",
-      };
-      store.setOrigin(wp);
+      });
     },
     [store]
   );
 
   const setDestinationFromPlace = useCallback(
     (place: GeocodingResult) => {
-      const wp: RouteWaypoint = {
+      store.setDestination({
         id: generateId(),
         label: place.name,
         coordinates: place.coordinates,
         type: "destination",
-      };
-      store.setDestination(wp);
+      });
     },
     [store]
   );
 
   const setOriginFromCoords = useCallback(
     (coords: { lng: number; lat: number }, label = "Origin") => {
-      const wp: RouteWaypoint = {
-        id: generateId(),
-        label,
-        coordinates: coords,
-        type: "origin",
-      };
-      store.setOrigin(wp);
+      store.setOrigin({ id: generateId(), label, coordinates: coords, type: "origin" });
     },
     [store]
   );
 
   const setDestinationFromCoords = useCallback(
     (coords: { lng: number; lat: number }, label = "Destination") => {
-      const wp: RouteWaypoint = {
-        id: generateId(),
-        label,
-        coordinates: coords,
-        type: "destination",
-      };
-      store.setDestination(wp);
+      store.setDestination({ id: generateId(), label, coordinates: coords, type: "destination" });
     },
     [store]
   );
 
   const clearAndClose = useCallback(() => {
+    abortRef.current?.abort();
     store.clearRoute();
-    if (mapInstance) removeRouteLayer(mapInstance);
-  }, [store, mapInstance]);
+  }, [store]);
 
   return {
-    // State
     origin: store.origin,
     destination: store.destination,
     routes: store.routes,
@@ -186,8 +134,6 @@ export function useRouting() {
     isPanelOpen: store.isPanelOpen,
     isPanelExpanded: store.isPanelExpanded,
     activeStepIndex: store.activeStepIndex,
-
-    // Actions
     calculateRoute,
     setOriginFromPlace,
     setDestinationFromPlace,

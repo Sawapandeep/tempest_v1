@@ -1,7 +1,7 @@
 "use client";
 // features/routing/components/RouteCanvas.tsx
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouteStore } from "@/store/routeStore";
 import { useMapStore } from "@/store/mapStore";
 import {
@@ -9,35 +9,41 @@ import {
     removeRouteLayer,
 } from "@/features/routing/services/routeLayerService";
 
-/**
- * Invisible component that synchronizes the route store's
- * geometry to MapLibre GL layers.  Mount it once inside MapShell.
- */
 export function RouteCanvas() {
     const { routes, activeRouteIndex, isVisible } = useRouteStore();
     const { mapInstance, isMapLoaded } = useMapStore();
+    const pendingRef = useRef(false);
 
     useEffect(() => {
         if (!mapInstance || !isMapLoaded) return;
 
-        if (!isVisible || routes.length === 0) {
-            removeRouteLayer(mapInstance);
-            return;
-        }
-
         const render = () => {
+            if (!isVisible || routes.length === 0) {
+                removeRouteLayer(mapInstance);
+                return;
+            }
             addRouteLayer(mapInstance, routes, activeRouteIndex);
         };
 
         if (mapInstance.isStyleLoaded()) {
             render();
         } else {
-            mapInstance.once("styledata", render);
+            const onStyleData = () => render();
+            mapInstance.once("styledata", onStyleData);
             return () => {
-                mapInstance.off("styledata", render)
+                mapInstance.off("styledata", onStyleData);
             };
         }
     }, [mapInstance, isMapLoaded, routes, activeRouteIndex, isVisible]);
+
+    // Clean up all route layers when component unmounts
+    useEffect(() => {
+        return () => {
+            if (mapInstance) {
+                removeRouteLayer(mapInstance);
+            }
+        };
+    }, [mapInstance]);
 
     return null;
 }

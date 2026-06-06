@@ -1,7 +1,7 @@
 "use client";
 // features/routing/components/DirectionsList.tsx
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     ArrowUp,
@@ -31,7 +31,6 @@ import { useRouting } from "@/features/routing/hooks/useRouting";
 import { useMapStore } from "@/store/mapStore";
 import type { RouteManeuver } from "@/types/routing";
 
-// Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
     ArrowUp,
     CornerUpRight,
@@ -72,7 +71,6 @@ interface StepItemProps {
 
 function StepItem({ step, index, isActive, isLast, onClick }: StepItemProps) {
     const color = getManeuverColor(step.type);
-
     return (
         <motion.button
             initial={{ opacity: 0, x: -8 }}
@@ -87,7 +85,7 @@ function StepItem({ step, index, isActive, isLast, onClick }: StepItemProps) {
             )}
             aria-current={isActive ? "step" : undefined}
         >
-            {/* Icon column */}
+            {/* Icon + connector line */}
             <div className="flex flex-col items-center shrink-0 pt-0.5">
                 <div
                     className={cn(
@@ -108,20 +106,13 @@ function StepItem({ step, index, isActive, isLast, onClick }: StepItemProps) {
                 )}
             </div>
 
-            {/* Content */}
+            {/* Text */}
             <div className="flex-1 min-w-0 pb-1">
-                <p
-                    className={cn(
-                        "text-sm leading-snug",
-                        isActive ? "text-foreground font-medium" : "text-foreground/90"
-                    )}
-                >
+                <p className={cn("text-sm leading-snug", isActive ? "text-foreground font-medium" : "text-foreground/90")}>
                     {step.instruction}
                 </p>
                 {step.streetName && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {step.streetName}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{step.streetName}</p>
                 )}
                 <div className="flex items-center gap-2 mt-1">
                     {step.distance > 0 && (
@@ -146,29 +137,25 @@ interface DirectionsListProps {
     maxHeight?: string;
 }
 
-export function DirectionsList({
-    isExpanded,
-    onToggle,
-    maxHeight = "50vh",
-}: DirectionsListProps) {
+export function DirectionsList({ isExpanded, onToggle, maxHeight = "50vh" }: DirectionsListProps) {
     const { activeRoute, activeStepIndex, setActiveStepIndex } = useRouting();
-    const { flyTo } = useMapStore();
-    const activeStepRef = useRef<HTMLButtonElement | null>(null);
+    const flyTo = useMapStore((s) => s.flyTo);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     const steps = activeRoute?.maneuvers ?? [];
 
-    // Scroll active step into view
+    // Auto-scroll active step into view
     useEffect(() => {
-        if (activeStepRef.current && isExpanded) {
-            activeStepRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
+        if (!isExpanded || !scrollRef.current) return;
+        const el = scrollRef.current.querySelector("[aria-current='step']") as HTMLElement | null;
+        el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, [activeStepIndex, isExpanded]);
 
     if (!activeRoute || !steps.length) return null;
 
     const handleStepClick = (step: RouteManeuver, index: number) => {
         setActiveStepIndex(index);
-        flyTo(step.location, 17);
+        flyTo({ lng: step.location.lng, lat: step.location.lat }, 17);
     };
 
     return (
@@ -178,16 +165,14 @@ export function DirectionsList({
             exit={{ opacity: 0 }}
             className="glass rounded-2xl overflow-hidden"
         >
-            {/* Header */}
+            {/* Collapse header */}
             <button
                 onClick={onToggle}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-subtle/50 transition-colors"
             >
                 <div className="flex items-center gap-2">
                     <Navigation className="w-3.5 h-3.5 text-tempest-400" />
-                    <span className="text-sm font-semibold text-foreground">
-                        Turn-by-Turn Directions
-                    </span>
+                    <span className="text-sm font-semibold text-foreground">Turn-by-Turn</span>
                     <span className="text-xs text-muted-foreground bg-surface-subtle rounded-full px-2 py-0.5">
                         {steps.length} steps
                     </span>
@@ -199,7 +184,7 @@ export function DirectionsList({
                 )}
             </button>
 
-            {/* Steps */}
+            {/* Steps list */}
             <AnimatePresence>
                 {isExpanded && (
                     <motion.div
@@ -210,6 +195,7 @@ export function DirectionsList({
                         className="overflow-hidden"
                     >
                         <div
+                            ref={scrollRef}
                             className="overflow-y-auto scrollbar-thin px-1 py-1"
                             style={{ maxHeight }}
                         >

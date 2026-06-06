@@ -68,6 +68,9 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "prompts1.tsx",
+"prompts2.tsx",
+"prompts.tsx",
   ]
 }

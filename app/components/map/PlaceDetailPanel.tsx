@@ -1,23 +1,22 @@
 "use client";
 // app/components/map/PlaceDetailPanel.tsx
+
 import { useMapStore } from "@/store/mapStore";
-import { useState, memo } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     X, MapPin, Navigation, Copy, ExternalLink, Bookmark,
-    Phone, Globe, Clock, Star, ChevronDown, ChevronUp,
-    Share2, Flag, Camera, Info, CheckCircle,
+    Phone, Globe, Clock, Star, ChevronDown,
+    Share2, Flag, Info, Navigation2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatCoordinates } from "@/lib/utils";
+import { cn, formatCoordinates } from "@/lib/utils";
 import { usePlaceDetails } from "@/features/places/hooks/usePlaceDetails";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useToast } from "@/app/components/ui/ToastProvider";
 import type { PlaceDetails } from "@/types/place";
 
-// ─────────────────────────────────────────────────────────────
-// Skeleton loading state
-// ─────────────────────────────────────────────────────────────
+/* ─── sub-components ──────────────────────────────────────────── */
+
 function PlaceSkeleton() {
     return (
         <div className="p-4 flex flex-col gap-3 animate-pulse">
@@ -43,12 +42,8 @@ function PlaceSkeleton() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Opening hours badge
-// ─────────────────────────────────────────────────────────────
 function OpenStatusBadge({ openNow, raw }: { openNow: boolean; raw?: string }) {
     const [expanded, setExpanded] = useState(false);
-
     return (
         <div className="space-y-1">
             <button
@@ -56,33 +51,17 @@ function OpenStatusBadge({ openNow, raw }: { openNow: boolean; raw?: string }) {
                 className="flex items-center gap-1.5 group"
                 aria-expanded={expanded}
             >
-                <div
-                    className={cn(
-                        "w-2 h-2 rounded-full shrink-0",
-                        openNow ? "bg-emerald-400" : "bg-red-400"
-                    )}
-                />
-                <span
-                    className={cn(
-                        "text-xs font-medium",
-                        openNow ? "text-emerald-400" : "text-red-400"
-                    )}
-                >
+                <div className={cn("w-2 h-2 rounded-full shrink-0", openNow ? "bg-emerald-400" : "bg-red-400")} />
+                <span className={cn("text-xs font-medium", openNow ? "text-emerald-400" : "text-red-400")}>
                     {openNow ? "Open now" : "Closed"}
                 </span>
+                {raw && <span className="text-muted-foreground/60 text-xs">· {raw.split(";")[0]}</span>}
                 {raw && (
-                    <span className="text-muted-foreground/60 text-xs">· {raw.split(";")[0]}</span>
-                )}
-                {raw && (
-                    <motion.div
-                        animate={{ rotate: expanded ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                    >
+                    <motion.div animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                         <ChevronDown className="w-3 h-3 text-muted-foreground/60 group-hover:text-muted-foreground" />
                     </motion.div>
                 )}
             </button>
-
             <AnimatePresence>
                 {expanded && raw && (
                     <motion.div
@@ -102,9 +81,6 @@ function OpenStatusBadge({ openNow, raw }: { openNow: boolean; raw?: string }) {
     );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Star rating display
-// ─────────────────────────────────────────────────────────────
 function StarRating({ rating, count }: { rating: number; count?: number }) {
     return (
         <div className="flex items-center gap-1">
@@ -114,9 +90,7 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
                         key={star}
                         className={cn(
                             "w-3 h-3",
-                            star <= Math.round(rating)
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-border"
+                            star <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "text-border"
                         )}
                     />
                 ))}
@@ -129,14 +103,9 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
     );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Photo strip
-// ─────────────────────────────────────────────────────────────
 function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> }) {
     const [viewIdx, setViewIdx] = useState<number | null>(null);
-
     if (!photos.length) return null;
-
     return (
         <>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar -mx-4 px-4">
@@ -150,7 +119,6 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
                         className="shrink-0 w-20 h-14 rounded-xl overflow-hidden border border-border/30 hover:border-tempest-500/50 transition-colors"
                         aria-label={`View photo ${i + 1}`}
                     >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={photo.thumb ?? photo.url}
                             alt={photo.caption ?? `Photo ${i + 1}`}
@@ -160,8 +128,6 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
                     </motion.button>
                 ))}
             </div>
-
-            {/* Lightbox */}
             <AnimatePresence>
                 {viewIdx !== null && (
                     <motion.div
@@ -186,16 +152,13 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
                             onClick={(e) => e.stopPropagation()}
                             className="max-w-2xl w-full"
                         >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={photos[viewIdx].url}
                                 alt={photos[viewIdx].caption ?? ""}
                                 className="w-full rounded-2xl"
                             />
                             {photos[viewIdx].caption && (
-                                <p className="text-white/70 text-xs text-center mt-2">
-                                    {photos[viewIdx].caption}
-                                </p>
+                                <p className="text-white/70 text-xs text-center mt-2">{photos[viewIdx].caption}</p>
                             )}
                         </motion.div>
                     </motion.div>
@@ -205,9 +168,6 @@ function PhotoStrip({ photos }: { photos: NonNullable<PlaceDetails["photos"]> })
     );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Detail row
-// ─────────────────────────────────────────────────────────────
 function DetailRow({
     icon: Icon,
     children,
@@ -222,12 +182,7 @@ function DetailRow({
     monospace?: boolean;
 }) {
     const inner = (
-        <div
-            className={cn(
-                "flex items-start gap-2.5 group",
-                (href || onClick) && "cursor-pointer"
-            )}
-        >
+        <div className={cn("flex items-start gap-2.5 group", (href || onClick) && "cursor-pointer")}>
             <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0 group-hover:text-tempest-400 transition-colors" />
             <span
                 className={cn(
@@ -240,37 +195,28 @@ function DetailRow({
             </span>
         </div>
     );
-
-    if (href) {
-        return (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-                {inner}
-            </a>
-        );
-    }
-
-    if (onClick) {
-        return <button onClick={onClick} className="w-full text-left">{inner}</button>;
-    }
-
+    if (href) return <a href={href} target="_blank" rel="noopener noreferrer">{inner}</a>;
+    if (onClick) return <button onClick={onClick} className="w-full text-left">{inner}</button>;
     return inner;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Main panel
-// ─────────────────────────────────────────────────────────────
-function PlaceDetailPanelContent() {
+/* ─── main export ─────────────────────────────────────────────── */
+
+interface PlaceDetailPanelProps {
+    onGetDirections?: () => void;
+}
+
+export function PlaceDetailPanel({ onGetDirections }: PlaceDetailPanelProps) {
     const { details, loadState, dismiss } = usePlaceDetails();
+    const selectedPlace = useMapStore((s) => s.selectedPlace);
     const { toast } = useToast();
     const isMobile = useMediaQuery("(max-width: 768px)");
     const [descExpanded, setDescExpanded] = useState(false);
 
-    if (!details && loadState === "idle") return null;
+    if (!selectedPlace) return null;
 
-    const coords = details?.coordinates;
-    const formattedCoords = coords
-        ? formatCoordinates(coords.lat, coords.lng)
-        : "";
+    const coords = details?.coordinates ?? selectedPlace?.coordinates;
+    const formattedCoords = coords ? formatCoordinates(coords.lat, coords.lng) : "";
 
     const copyCoords = async () => {
         if (!coords) return;
@@ -279,17 +225,10 @@ function PlaceDetailPanelContent() {
     };
 
     const copyAddress = async () => {
-        if (!details?.address) return;
-        await navigator.clipboard.writeText(details.address);
+        const addr = details?.address ?? selectedPlace?.address;
+        if (!addr) return;
+        await navigator.clipboard.writeText(addr);
         toast({ type: "success", title: "Address copied", duration: 2000 });
-    };
-
-    const openDirections = () => {
-        if (!coords) return;
-        window.open(
-            `https://www.openstreetmap.org/directions?from=&to=${coords.lat},${coords.lng}`,
-            "_blank"
-        );
     };
 
     const sharePlace = async () => {
@@ -297,7 +236,7 @@ function PlaceDetailPanelContent() {
             ? `https://www.openstreetmap.org/#map=17/${coords.lat}/${coords.lng}`
             : window.location.href;
         if (navigator.share) {
-            await navigator.share({ title: details?.name, url });
+            await navigator.share({ title: details?.name ?? selectedPlace?.name, url });
         } else {
             await navigator.clipboard.writeText(url);
             toast({ type: "success", title: "Link copied", duration: 2000 });
@@ -315,6 +254,10 @@ function PlaceDetailPanelContent() {
     const hasDesc = !!details?.description;
     const MAX_DESC = 140;
 
+    const displayName = details?.name ?? selectedPlace?.name ?? "Selected place";
+    const displayCategory = details?.category ?? selectedPlace?.category;
+    const displayAddress = details?.address ?? selectedPlace?.address;
+
     return (
         <motion.div
             key="place-panel"
@@ -327,16 +270,14 @@ function PlaceDetailPanelContent() {
                 isMobile ? "w-full" : "max-w-sm w-full"
             )}
             role="complementary"
-            aria-label={`Place details for ${details?.name ?? "selected place"}`}
+            aria-label={`Place details for ${displayName}`}
         >
-            {/* ── Header ── */}
+            {/* Header */}
             <div className="px-4 pt-4 pb-3">
                 <div className="flex items-start gap-3">
-                    {/* Category icon */}
                     <div className="w-10 h-10 rounded-xl bg-tempest-500/15 border border-tempest-500/25 flex items-center justify-center shrink-0">
                         <MapPin className="w-5 h-5 text-tempest-400" />
                     </div>
-
                     <div className="flex-1 min-w-0">
                         {loadState === "loading" && !details ? (
                             <div className="space-y-1.5">
@@ -345,13 +286,9 @@ function PlaceDetailPanelContent() {
                             </div>
                         ) : (
                             <>
-                                <h2 className="text-sm font-semibold text-foreground leading-snug">
-                                    {details?.name}
-                                </h2>
-                                {details?.category && (
-                                    <p className="text-[11px] text-tempest-400/80 mt-0.5 capitalize">
-                                        {details.category}
-                                    </p>
+                                <h2 className="text-sm font-semibold text-foreground leading-snug">{displayName}</h2>
+                                {displayCategory && (
+                                    <p className="text-[11px] text-tempest-400/80 mt-0.5 capitalize">{displayCategory}</p>
                                 )}
                                 {details?.rating !== undefined && (
                                     <div className="mt-1">
@@ -361,7 +298,6 @@ function PlaceDetailPanelContent() {
                             </>
                         )}
                     </div>
-
                     <button
                         onClick={dismiss}
                         className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5 focus-visible:outline-none"
@@ -372,55 +308,32 @@ function PlaceDetailPanelContent() {
                 </div>
             </div>
 
-            {/* ── Divider ── */}
             <div className="h-px bg-border/40 mx-4" />
 
-            {/* ── Content ── */}
+            {/* Body */}
             {loadState === "loading" && !details ? (
                 <PlaceSkeleton />
             ) : (
                 <>
-                    {/* Photos */}
                     {hasPhotos && (
                         <div className="px-4 pt-3">
                             <PhotoStrip photos={details!.photos!} />
                         </div>
                     )}
 
-                    {/* Details list */}
                     <div className="px-4 py-3 space-y-2.5">
-                        {/* Address */}
-                        {details?.address && (
-                            <DetailRow icon={MapPin} onClick={copyAddress}>
-                                {details.address}
-                            </DetailRow>
+                        {displayAddress && (
+                            <DetailRow icon={MapPin} onClick={copyAddress}>{displayAddress}</DetailRow>
                         )}
-
-                        {/* Coordinates */}
                         {coords && (
-                            <DetailRow icon={Copy} onClick={copyCoords} monospace>
-                                {formattedCoords}
-                            </DetailRow>
+                            <DetailRow icon={Copy} onClick={copyCoords} monospace>{formattedCoords}</DetailRow>
                         )}
-
-                        {/* Phone */}
                         {details?.contact?.phone && (
-                            <DetailRow
-                                icon={Phone}
-                                href={`tel:${details.contact.phone}`}
-                            >
-                                {details.contact.phone}
-                            </DetailRow>
+                            <DetailRow icon={Phone} href={`tel:${details.contact.phone}`}>{details.contact.phone}</DetailRow>
                         )}
-
-                        {/* Website */}
                         {websiteUrl && (
-                            <DetailRow icon={Globe} href={websiteUrl}>
-                                {details!.contact!.website}
-                            </DetailRow>
+                            <DetailRow icon={Globe} href={websiteUrl}>{details!.contact!.website}</DetailRow>
                         )}
-
-                        {/* Opening hours */}
                         {hasOpeningHours && (
                             <div className="flex items-start gap-2.5">
                                 <Clock className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
@@ -430,8 +343,6 @@ function PlaceDetailPanelContent() {
                                 />
                             </div>
                         )}
-
-                        {/* Description */}
                         {hasDesc && (
                             <div className="space-y-1">
                                 <div className="flex items-start gap-2.5">
@@ -454,24 +365,21 @@ function PlaceDetailPanelContent() {
                                 </div>
                             </div>
                         )}
-
-                        {/* OSM link */}
-                        {details?.id.startsWith("osm-") && (
+                        {selectedPlace?.id.startsWith("osm-") && coords && (
                             <DetailRow
                                 icon={ExternalLink}
-                                href={`https://www.openstreetmap.org/${coords ? `?mlat=${coords.lat}&mlon=${coords.lng}` : ""}`}
+                                href={`https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}`}
                             >
                                 View on OpenStreetMap
                             </DetailRow>
                         )}
                     </div>
 
-                    {/* ── Actions ── */}
+                    {/* Action buttons */}
                     <div className="px-4 pb-4 flex gap-2">
-                        {/* Directions */}
                         <motion.button
                             whileTap={{ scale: 0.96 }}
-                            onClick={openDirections}
+                            onClick={onGetDirections}
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl",
                                 "text-xs font-medium bg-tempest-500 text-white",
@@ -479,11 +387,10 @@ function PlaceDetailPanelContent() {
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             )}
                         >
-                            <Navigation className="w-3.5 h-3.5" />
+                            <Navigation2 className="w-3.5 h-3.5" />
                             Directions
                         </motion.button>
 
-                        {/* Save */}
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             className={cn(
@@ -498,7 +405,6 @@ function PlaceDetailPanelContent() {
                             <Bookmark className="w-4 h-4" />
                         </motion.button>
 
-                        {/* Share */}
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             onClick={sharePlace}
@@ -514,7 +420,6 @@ function PlaceDetailPanelContent() {
                             <Share2 className="w-4 h-4" />
                         </motion.button>
 
-                        {/* Report */}
                         <motion.button
                             whileTap={{ scale: 0.93 }}
                             className={cn(
@@ -532,34 +437,5 @@ function PlaceDetailPanelContent() {
                 </>
             )}
         </motion.div>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Export — wraps in AnimatePresence for mount/unmount animation
-// ─────────────────────────────────────────────────────────────
-// export const PlaceDetailPanel = memo(function PlaceDetailPanel() {
-//     const selectedPlace = (() => {
-//         // read from mapStore directly to decide show/hide
-//         // eslint-disable-next-line react-hooks/rules-of-hooks
-//         const { useMapStore } = require("@/store/mapStore");
-//         return useMapStore((s: { selectedPlace: unknown }) => s.selectedPlace);
-//     })();
-
-//     return (
-//         <AnimatePresence>
-//             {selectedPlace && <PlaceDetailPanelContent />}
-//         </AnimatePresence>
-//     );
-// });
-export function PlaceDetailPanel() {
-    const selectedPlace = useMapStore(
-        (state) => state.selectedPlace
-    );
-
-    return (
-        <div>
-            {selectedPlace?.name}
-        </div>
     );
 }

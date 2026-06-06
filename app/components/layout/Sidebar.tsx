@@ -1,11 +1,11 @@
 "use client";
 // app/components/layout/Sidebar.tsx
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Search, Bookmark, Settings,
-    ChevronLeft, ChevronRight, Star,
+    ChevronLeft, ChevronRight, Star, Navigation2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/features/search/components/SearchBar";
@@ -16,7 +16,11 @@ import { QuickActions } from "@/app/components/layout/QuickActions";
 
 type SidebarTab = "search" | "saved" | "settings";
 
-export function Sidebar() {
+interface SidebarProps {
+    onOpenRouting?: () => void;
+}
+
+export function Sidebar({ onOpenRouting }: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState<SidebarTab>("search");
     const { isOpen: searchOpen, results, query, isSearching } = useSearchStore();
@@ -26,7 +30,7 @@ export function Sidebar() {
 
     return (
         <div className="h-full flex pointer-events-auto select-none">
-            {/* Panel */}
+            {/* Main panel */}
             <AnimatePresence initial={false} mode="wait">
                 {!collapsed && (
                     <motion.div
@@ -40,7 +44,7 @@ export function Sidebar() {
                         <div className="w-[360px] h-full flex flex-col glass border-r border-border/50">
                             <SidebarBrand />
 
-                            {/* Tabs */}
+                            {/* Tab row */}
                             <div className="flex items-center gap-1 px-3 pb-3 border-b border-border/40">
                                 {(
                                     [
@@ -66,6 +70,22 @@ export function Sidebar() {
                                         {label}
                                     </button>
                                 ))}
+
+                                {/* Directions shortcut */}
+                                {onOpenRouting && (
+                                    <motion.button
+                                        whileTap={{ scale: 0.93 }}
+                                        onClick={onOpenRouting}
+                                        className={cn(
+                                            "ml-auto flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium",
+                                            "bg-tempest-500/15 text-tempest-400 hover:bg-tempest-500/25 transition-all"
+                                        )}
+                                        aria-label="Get directions"
+                                    >
+                                        <Navigation2 className="w-3.5 h-3.5" />
+                                        Directions
+                                    </motion.button>
+                                )}
                             </div>
 
                             {/* Content */}
