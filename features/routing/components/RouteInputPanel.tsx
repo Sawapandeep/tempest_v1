@@ -18,13 +18,11 @@ import { generateId } from "@/lib/utils";
 
 const PROFILE_ICONS: Record<RouteProfile, React.ElementType> = {
     driving: Car,
+    motorcycle: Bike,     // motorbike icon
     walking: Footprints,
     cycling: Bike,
-    motorcycle: Car,
     bus: Car,
 };
-
-/* ─── WaypointInput ─────────────────────────────────────────── */
 
 interface WaypointInputProps {
     value: string;
@@ -77,13 +75,11 @@ function WaypointInput({
 
     return (
         <div className="relative">
-            <div
-                className={cn(
-                    "flex items-center gap-2 px-3 h-10 rounded-xl transition-all duration-150",
-                    "bg-surface-subtle border",
-                    isFocused ? "border-tempest-500/60 ring-1 ring-tempest-500/30" : "border-border/50"
-                )}
-            >
+            <div className={cn(
+                "flex items-center gap-2 px-3 h-10 rounded-xl transition-all duration-150",
+                "bg-surface-subtle border",
+                isFocused ? "border-tempest-500/60 ring-1 ring-tempest-500/30" : "border-border/50"
+            )}>
                 <span className="shrink-0 text-muted-foreground">{icon}</span>
                 <input
                     autoFocus={autoFocus}
@@ -144,8 +140,6 @@ function WaypointInput({
     );
 }
 
-/* ─── RouteInputPanel ───────────────────────────────────────── */
-
 interface RouteInputPanelProps {
     onClose: () => void;
     initialDestinationName?: string;
@@ -160,7 +154,6 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
         setDestinationFromPlace,
         setProfile, swapWaypoints,
     } = useRouting();
-
     const { userLocation } = useMapStore();
 
     const [originLabel, setOriginLabel] = useState(origin?.label ?? "");
@@ -193,17 +186,13 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
             <div className="flex items-center gap-2 px-4 pt-4 pb-3">
                 <Navigation2 className="w-4 h-4 text-tempest-400 shrink-0" />
                 <span className="text-sm font-semibold text-foreground flex-1">Get Directions</span>
-                <button
-                    onClick={onClose}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Close directions"
-                >
+                <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close directions">
                     <X className="w-4 h-4" />
                 </button>
             </div>
 
-            {/* Mode selector */}
-            <div className="flex gap-1 px-4 pb-3">
+            {/* Transport mode tabs */}
+            <div className="flex gap-1 px-4 pb-3 overflow-x-auto no-scrollbar">
                 {ROUTE_PROFILES.map((p) => {
                     const Icon = PROFILE_ICONS[p.id];
                     const isActive = activeProfile === p.id;
@@ -213,7 +202,7 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
                             whileTap={{ scale: 0.93 }}
                             onClick={() => setProfile(p.id)}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all",
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all shrink-0",
                                 isActive
                                     ? "bg-tempest-500/20 text-tempest-400 border border-tempest-500/40"
                                     : "bg-surface-subtle border border-border/50 text-muted-foreground hover:text-foreground"
@@ -228,14 +217,13 @@ export function RouteInputPanel({ onClose, initialDestinationName }: RouteInputP
 
             {/* Waypoint inputs */}
             <div className="px-4 pb-3 flex gap-2">
-                {/* Visual connector */}
+                {/* Route line dots */}
                 <div className="flex flex-col items-center pt-2.5 pb-2.5 gap-0 shrink-0">
                     <Circle className="w-3 h-3 text-emerald-400 fill-emerald-400" />
                     <div className="flex-1 w-px bg-border/50 my-1 min-h-[20px]" />
                     <MapPin className="w-3 h-3 text-tempest-400 fill-tempest-400/30" />
                 </div>
 
-                {/* Inputs */}
                 <div className="flex-1 flex flex-col gap-2 min-w-0">
                     <WaypointInput
                         value={originLabel}
